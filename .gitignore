@@ -1,0 +1,28 @@
+# caches & downloads
+.probes_cache/
+*.nc
+*.nc4
+*.csv.gz
+data/
+runs/
+
+# secrets — never commit
+.env
+.coopernicusmarine-credentials
+credentials.json
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# notebooks
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+probes/RESULTS.jsonl

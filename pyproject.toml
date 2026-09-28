@@ -1,0 +1,38 @@
+[project]
+name = "ocean-sim"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "cmocean>=4.0.3",
+    "gsw>=3.6.23",
+    "h5netcdf>=1.8.1",
+    "matplotlib>=3.11.2",
+    "netcdf4>=1.7.4",
+    "numpy>=2.5.3",
+    "pandas>=3.0.6",
+    "plotly>=7.1.0",
+    "psycopg[binary]>=3.3.6",
+    "requests>=2.34.2",
+    "scipy>=1.18.1",
+    "soundfile>=0.14.0",
+    "xarray>=2026.7.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.9",
+]
+
+[tool.ruff]
+line-length = 90
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "RUF"]
+# PERF102/SIM117 are micro-optimisations that make probe code harder to read for no
+# measurable gain -- a probe runs a handful of times, not in a hot loop.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# probes deliberately catch broad exceptions: a failed probe IS the data
+"probes/*" = ["BLE001"]

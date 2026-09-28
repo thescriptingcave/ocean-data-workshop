@@ -1,0 +1,97 @@
+# ocean-sim
+
+An ocean **data workbench** for learning time-series SQL and ML on real public data.
+
+Not a simulator. For observational data the measurements *are* the answer — the job is
+to interpret them, not to predict them.
+
+## Phase -1: data access audit
+
+The first phase answers one question about every candidate dataset: **can we get it, and
+what does getting it cost?**
+
+```bash
+uv run python -m probes.run_all
+```
+
+Writes `probes/INVENTORY.md` (generated, ticked per probe). The human judgement —
+which is the real output — is in **[`probes/VERDICTS.md`](probes/VERDICTS.md)**.
+
+Current status: **7/7 Tier 1 probes passing.**
+
+## Access classes
+
+| Class | Meaning | One-time cost |
+|---|---|---|
+| **A** | Anonymous HTTP. No account, no key. | 0 |
+| **B** | Anonymous, other protocol (FTP, OPeNDAP). | 0–1 hr |
+| **C** | Free account, password login. | 5–15 min |
+| **D** | Free account + API key. | 10–30 min |
+| **E** | Account + terms or approval. | 1 day–2 weeks |
+| **F** | Manual request — email, form, a person. | days–weeks |
+| **G** | Licensed. Free academic, commercial prohibited. | constrains the project |
+| **H** | Unavailable. | — |
+
+A and B are free wins. E, F, and G are where projects die.
+
+## What works, with no account and no key
+
+| Source | Gives | Access |
+|---|---|---|
+| **NCEI passive acoustic** (`noaa-passive-bioacoustic`, GCS) | hydrophone detections, sound-level metrics, clips | A |
+| **Argo GDAC** (`data-argo.ifremer.fr`) | in-situ T/S/pressure to 2000 m, QC flags | A |
+| **ERDDAP** (`coastwatch.pfeg.noaa.gov`) | `jplMURSST41` SST at 0.045°, 1,000+ griddap datasets | A |
+| **GEBCO / WOA23 / NDBC / HYCOM** | bathymetry, climatology, buoys, reanalysis | A/B |
+
+The acoustic side is the strongest find: the SanctSound CI sites carry **13 labelled
+detection classes** (`ships`, `dolphins_1h`, three whale species, `bocaccio`,
+`pinnipeds`, `plainfinmidshipman`, `explosions`, `sonar`, …) with hourly 0/1 presence.
+
+Still gated behind a free account: **GLORYS12V1** (Class C) for the 4D T/S/current fields.
+
+## Setup
+
+```bash
+uv sync
+docker compose up -d          # TimescaleDB on :5432
+export OCEAN_SIM_DSN="postgresql://postgres:ocean@localhost:5432/ocean_sim"
+```
+
+## Two machine gotchas, already handled in `probes/_common.py`
+
+**Use `http_session()`, never bare `requests`.** This host has AAAA records but no IPv6
+route. curl races addresses (Happy Eyeballs); urllib3 waits out the full connect timeout
+on the dead IPv6 address first — a measured **100× slowdown**, every call.
+
+**`aws s3` is redirected to MinIO.** `~/.aws/config` sets
+`endpoint_url = http://localhost:9000` in the default profile, so bare `aws s3 ls` fails
+against a local service. Pass `--endpoint-url https://storage.googleapis.com`, or use the
+GCS JSON API, which needs no CLI at all.
+
+## Layout
+
+```
+probes/          Phase -1 access probes
+  _common.py     contract, cache, verdict format, IPv4-forcing HTTP session
+  probe_NN_*.py  one per dataset, exposing fetch(tiny=True)
+  run_all.py     runs everything, regenerates INVENTORY.md
+  VERDICTS.md    hand-written judgements — the real output
+  RESULTS.jsonl  append-only history, including fixed failures
+  LATEST.json    most recent result per probe
+```
+
+Downloads cache to `~/.cache/ocean-sim-harness/` and are reused by later phases, so the
+probes are not throwaway work.
+
+## Dependencies that are *not* used
+
+- **`argopy`** — broken. Both 1.3.1 and 1.4.0 import a private symbol removed in
+  erddapy 3.x. GDAC is fetched directly instead.
+- **Any ORM** — hypertables, `time_bucket()`, and the window functions this project
+  exists to learn are raw-SQL features an ORM would obscure.
+
+## The gate
+
+Phase -1 is not finished until the gate passes: **load a month, plot time × depth, and
+write down three questions worth asking.** Everything here proves *access*. Nothing yet
+proves *interest*.

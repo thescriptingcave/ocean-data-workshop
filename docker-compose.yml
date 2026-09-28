@@ -1,0 +1,19 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg17
+    container_name: ocean-sim-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ocean      # local dev only, never a real secret
+      POSTGRES_DB: ocean_sim
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ocean_sim"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+
+volumes:
+  timescale_data:
