@@ -27,6 +27,7 @@ PROBE_MODULES = [
     "probe_07_argo",
     "probe_08_glorys",
     "probe_09_metadata",
+    "probe_10_ndbc_wind",
 ]
 
 MARK = {"PASS": "[x]", "FAIL": "[ ]", "WARN": "[~]"}

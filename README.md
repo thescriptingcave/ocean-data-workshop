@@ -17,7 +17,7 @@ uv run python -m probes.run_all
 Writes `probes/INVENTORY.md` (generated, ticked per probe). The human judgement —
 which is the real output — is in **[`probes/VERDICTS.md`](probes/VERDICTS.md)**.
 
-Current status: **9/9 Tier 1 probes passing, including the one Class C source.**
+Current status: **10/10 Tier 1 probes passing, including the one Class C source.**
 
 ## Access classes
 
@@ -41,7 +41,8 @@ A and B are free wins. E, F, and G are where projects die.
 | **NCEI passive acoustic** (`noaa-passive-bioacoustic`, GCS) | hydrophone detections, sound-level metrics, clips | A |
 | **Argo GDAC** (`data-argo.ifremer.fr`) | in-situ T/S/pressure to 2000 m, QC flags | A |
 | **ERDDAP** (`coastwatch.pfeg.noaa.gov`) | `jplMURSST41` SST at 0.045°, 1,000+ griddap datasets | A |
-| **GEBCO / WOA23 / NDBC / HYCOM** | bathymetry, climatology, buoys, reanalysis | A/B |
+| **NDBC 46092 (MBM1)** | hourly wind speed/direction, gusts, air and sea temperature | A |
+| **GEBCO / WOA23 / HYCOM** | bathymetry, climatology, reanalysis | A/B |
 | **GLORYS12V1** (Copernicus Marine) | daily T/S/**currents**/SSH, 1/12°, 50 levels | **C** |
 
 The acoustic side is the strongest find. The SanctSound CI sites carry **13 labelled
@@ -100,6 +101,23 @@ probes are not throwaway work.
   erddapy 3.x. GDAC is fetched directly instead.
 - **Any ORM** — hypertables, `time_bucket()`, and the window functions this project
   exists to learn are raw-SQL features an ORM would obscure.
+
+## Wind: the obvious source is broken
+
+The nearest buoy to the ocean site, **46042** (36 km), lost its **wind-direction sensor
+on 2019-08-18** and did not recover it until the end of December. September is 100%
+missing. Speed kept reporting; direction did not — and the northerly component that
+drives California upwelling is derived from direction, so the most important variable for
+this site was absent for the entire planned window.
+
+**46092 ("MBM1"), 10 km away, is complete** and is now the primary wind source. Mean
+5.4 m/s from 316° — northwesterly and upwelling-favourable, confirming the site is in
+the right dynamical setting.
+
+The strongest relationship in the dataset is northerly wind leading southward current by
+about six days (r = −0.61), which matches the known Ekman spin-up timescale. But 30 daily
+points is thin for a lag correlation, so the window should be widened before that number
+is trusted.
 
 ## The gate
 

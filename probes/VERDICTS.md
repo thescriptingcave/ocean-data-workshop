@@ -3,7 +3,7 @@
 Hand-written judgements. An exit code says "the fetch worked"; this says whether the
 data is *usable* and what we should do about it.
 
-**Status: 9/9 Tier 1 probes green, including the one Class C source.** The gate (§7) is
+**Status: 10/10 Tier 1 probes green, including the one Class C source.** The gate (§7) is
 the one item still outstanding.
 
 ---
@@ -183,12 +183,17 @@ for.
 | raw audio as the acoustic source | **detections + sound-level metrics first** | labels and HMD are the learning payload |
 | "when did the thermocline cross 40 m" | **"cross 10 / 15 / 20 m"** | at this site it reaches 21.6 m, not 40 m. Same question, with an answer in it |
 | hydrophone at 48 kHz | **96 kHz, 116 m deep, 16 km away** | from the metadata index; 48 kHz clips the dolphin click band |
+| wind from buoy 46042 | **wind from 46092 (MBM1), 10 km** | 46042's direction sensor was out for the entire window |
+| September-only analysis window | **widen it** | 30 daily points is too few for the lag correlations we want; both sources allow longer |
 
 ## Outstanding
 
-- **The gate is not done.** Load a month, plot time × depth, write down three questions.
-  The GLORYS probe is most of the way there — thermocline at 15.8 m moving 21 m across
-  the month — but the plot and the three questions are the actual test.
+- **The gate step 3 is still yours.** Steps 1–2 are done: `scripts/gate_look.py` produces
+  three figures, and the month has two thermal phases plus a quasi-periodic ~9–10 day
+  current oscillation. What is missing is three questions *you* want to ask.
+- **Widen the analysis window.** September alone gives 30 daily points, which is too few
+  to trust the lag correlations. Both GLORYS (from 1993) and NDBC (decades) allow much
+  longer.
 - **The ML question is untested.** Whether a one-line rule already solves the dolphin
   labels decides whether that exercise is real or needs a self-defined target.
 - **Watkins, OBIS, Orcasound, ShipsEar, WOA23, GEBCO, NDBC, HYCOM** — Tier 2/3, not yet probed.
