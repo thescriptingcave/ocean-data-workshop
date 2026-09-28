@@ -38,3 +38,10 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 # probes deliberately catch broad exceptions: a failed probe IS the data
 "probes/*" = ["BLE001"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ocean_sim"]

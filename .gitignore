@@ -26,3 +26,6 @@ __pycache__/
 # macOS
 .DS_Store
 probes/RESULTS.jsonl
+
+# gate figures are regenerable
+figures/

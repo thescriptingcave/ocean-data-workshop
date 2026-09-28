@@ -1045,7 +1045,7 @@ wheels = [
 [[package]]
 name = "ocean-sim"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "cmocean" },
     { name = "copernicusmarine" },
