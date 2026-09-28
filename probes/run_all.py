@@ -64,40 +64,45 @@ def main(argv: list[str] | None = None) -> int:
         append_verdict(res)
         results.append(res)
 
-    # write the generated inventory
-    lines = [INVENTORY_HEADER]
-    npass = 0
-    for modname in PROBE_MODULES:
-        mod = importlib.import_module(f"probes.{modname}")
-        h = mod.HARNESS
-        r = next((x for x in results if x.slug == h.slug), None)
-        if r is None:
-            continue
-        npass += r.status == "PASS"
-        lines.append(
-            f"| {MARK[r.status]} | **{h.slug}** — {h.name} | {h.klass} | "
-            f"{h.provides} | {r.status} in {r.seconds:.1f}s |"
-        )
-    total = len(results)
-    lines.append(f"\n**{npass}/{total} passing.**\n")
-
-    out = PROJECT / "probes" / "INVENTORY.md"
-    out.write_text("".join(lines))
-    print(f"\nwrote {out.relative_to(PROJECT)}  ({npass}/{total} passing)")
-
-    # also refresh the machine-readable latest-per-slug view
-    latest = {}
+    # Write the generated inventory from *all* recorded results, not just the ones that
+    # ran this invocation. Otherwise `--only foo` silently truncates INVENTORY.md to a
+    # single row, which is exactly the bug that made this file briefly wrong.
+    recorded: dict[str, dict] = {}
     rj = PROJECT / "probes" / "RESULTS.jsonl"
     if rj.exists():
         for ln in rj.read_text().splitlines():
             if ln.strip():
                 d = json.loads(ln)
-                latest[d["slug"]] = d
+                recorded[d["slug"]] = d  # later lines win
+
+    lines = [INVENTORY_HEADER]
+    npass = ntotal = 0
+    for modname in PROBE_MODULES:
+        mod = importlib.import_module(f"probes.{modname}")
+        h = mod.HARNESS
+        if h.slug not in recorded:
+            continue
+        d = recorded[h.slug]
+        npass += d["status"] == "PASS"
+        ntotal += 1
+        lines.append(
+            f"| {MARK[d['status']]} | **{h.slug}** — {h.name} | {h.klass} | "
+            f"{h.provides} | {d['status']} in {d['seconds']:.1f}s |"
+        )
+    lines.append(f"\n**{npass}/{ntotal} passing.**\n")
+
+    out = PROJECT / "probes" / "INVENTORY.md"
+    out.write_text("".join(lines))
+    scope = "" if not wanted else f" (ran {len(results)} of {ntotal})"
+    print(f"\nwrote {out.relative_to(PROJECT)}  ({npass}/{ntotal} passing){scope}")
+
     (PROJECT / "probes" / "LATEST.json").write_text(
-        json.dumps(latest, indent=2, sort_keys=True) + "\n"
+        json.dumps(recorded, indent=2, sort_keys=True) + "\n"
     )
 
-    return 0 if npass == total else 1
+    # Exit non-zero only if something we actually ran failed.
+    ran_failed = [r for r in results if r.status != "PASS"]
+    return 1 if ran_failed else 0
 
 
 if __name__ == "__main__":
