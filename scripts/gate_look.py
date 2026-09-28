@@ -59,7 +59,9 @@ def main() -> int:
     # ---------------------------------------------------------------- figure 1
     # time x depth for every variable -- the single most informative picture here
     fig, axes = plt.subplots(2, 2, figsize=(15, 10), constrained_layout=True)
-    for ax, (name, (label, unit, cmap, vmin, vmax)) in zip(axes.ravel(), VARS.items()):
+    for ax, (name, (label, unit, cmap, vmin, vmax)) in zip(
+        axes.ravel(), VARS.items(), strict=True
+    ):
         field = ds[name].mean(dim=["latitude", "longitude"])  # (time, depth)
         m = field.plot.pcolormesh(
             ax=ax,
@@ -100,7 +102,6 @@ def main() -> int:
                         OCEAN_SITE.lat)
     ct = gsw.CT_from_t(sa, t_prof.values, t_prof.depth.values * 1.0198)
     c = gsw.sound_speed(sa, ct, t_prof.depth.values * 1.0198)
-    sigma = gsw.sigma0(sa, ct)
 
     axes[1].plot(c, t_prof.depth, color="black")
     axes[1].set_xlabel("m s⁻¹")

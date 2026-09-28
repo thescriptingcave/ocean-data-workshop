@@ -33,7 +33,11 @@ target-version = "py312"
 select = ["E", "F", "I", "N", "UP", "B", "RUF"]
 # PERF102/SIM117 are micro-optimisations that make probe code harder to read for no
 # measurable gain -- a probe runs a handful of times, not in a hot loop.
-ignore = ["E501"]
+ignore = [
+  "E501",
+  # RUF001: figure labels use real math notation (x, minus) on purpose
+  "RUF001",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # probes deliberately catch broad exceptions: a failed probe IS the data
