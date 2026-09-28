@@ -31,7 +31,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from ._common import PROJECT, PASS, Probe, Result, run
+from ._common import PASS, PROJECT, Probe, Result, run
 
 HARNESS = Probe(
     slug="glorys",
@@ -139,7 +139,7 @@ def check() -> Result:
                     f"'when did it cross 40 m' question would have no answer"
                 )
         ds.close()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         problems.append(f"thetao failed: {type(exc).__name__}: {exc}")
 
     # --- currents: nothing else probed supplies these ---
@@ -165,7 +165,7 @@ def check() -> Result:
             problems.append(f"mean current speed {sp:.3f} m/s implausible")
         du.close()
         dv.close()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         problems.append(f"currents failed: {type(exc).__name__}: {exc}")
 
     if problems:

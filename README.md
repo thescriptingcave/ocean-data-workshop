@@ -17,7 +17,7 @@ uv run python -m probes.run_all
 Writes `probes/INVENTORY.md` (generated, ticked per probe). The human judgement —
 which is the real output — is in **[`probes/VERDICTS.md`](probes/VERDICTS.md)**.
 
-Current status: **8/8 Tier 1 probes passing, including the one Class C source.**
+Current status: **9/9 Tier 1 probes passing, including the one Class C source.**
 
 ## Access classes
 
@@ -44,9 +44,16 @@ A and B are free wins. E, F, and G are where projects die.
 | **GEBCO / WOA23 / NDBC / HYCOM** | bathymetry, climatology, buoys, reanalysis | A/B |
 | **GLORYS12V1** (Copernicus Marine) | daily T/S/**currents**/SSH, 1/12°, 50 levels | **C** |
 
-The acoustic side is the strongest find: the SanctSound CI sites carry **13 labelled
+The acoustic side is the strongest find. The SanctSound CI sites carry **13 labelled
 detection classes** (`ships`, `dolphins_1h`, three whale species, `bocaccio`,
 `pinnipeds`, `plainfinmidshipman`, `explosions`, `sonar`, …) with hourly 0/1 presence.
+
+A `big_query_metadata/` index in the same bucket catalogues all 25,503 recording files
+with coordinates and sensor depths, which is how the acoustic anchor was chosen: a
+hydrophone **16 km from the ocean site, moored at 116 m, recording at 96 kHz** — deep
+enough for a real sound channel, and fast enough to capture the 30–50 kHz dolphin click
+band. Same upwelling system as the GLORYS site, so the CTD and the hydrophone describe
+the same water mass. That join is what the project rests on.
 
 **GLORYS12V1 is the only source supplying currents** — Argo has profiles but no
 velocity, ERDDAP has surface temperature only — so the Class C account is load-bearing

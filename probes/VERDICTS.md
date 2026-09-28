@@ -3,7 +3,7 @@
 Hand-written judgements. An exit code says "the fetch worked"; this says whether the
 data is *usable* and what we should do about it.
 
-**Status: 8/8 Tier 1 probes green, including the one Class C source.** The gate (§7) is
+**Status: 9/9 Tier 1 probes green, including the one Class C source.** The gate (§7) is
 the one item still outstanding.
 
 ---
@@ -182,6 +182,7 @@ for.
 | binary labels (ship vs dolphin) | **multi-class, 13 classes** | far richer than assumed |
 | raw audio as the acoustic source | **detections + sound-level metrics first** | labels and HMD are the learning payload |
 | "when did the thermocline cross 40 m" | **"cross 10 / 15 / 20 m"** | at this site it reaches 21.6 m, not 40 m. Same question, with an answer in it |
+| hydrophone at 48 kHz | **96 kHz, 116 m deep, 16 km away** | from the metadata index; 48 kHz clips the dolphin click band |
 
 ## Outstanding
 
