@@ -102,7 +102,7 @@ def wind_daily() -> pd.DataFrame:
 
 def main() -> int:
     print("loading acoustic third-octave levels ...")
-    ac, freqs = acoustic_daily()
+    ac, _freqs = acoustic_daily()
     print("loading ocean ...")
     oc = ocean_daily()
     print("loading wind ...")
@@ -116,7 +116,7 @@ def main() -> int:
           f"{merged.index.min().date()} .. {merged.index.max().date()}")
 
     band_cols = [c for c in merged.columns if c.startswith("L_")]
-    have = merged.dropna(subset=band_cols + ["wind_speed_mean"])
+    have = merged.dropna(subset=[*band_cols, "wind_speed_mean"])
     print(f"with wind + all bands: {len(have)} days")
 
     print(f"\n--- does local wind drive each third-octave band? (lags 0-{MAX_LAG} h) ---")
