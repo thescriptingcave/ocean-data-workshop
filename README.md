@@ -17,7 +17,7 @@ uv run python -m probes.run_all
 Writes `probes/INVENTORY.md` (generated, ticked per probe). The human judgement —
 which is the real output — is in **[`probes/VERDICTS.md`](probes/VERDICTS.md)**.
 
-Current status: **7/7 Tier 1 probes passing.**
+Current status: **8/8 Tier 1 probes passing, including the one Class C source.**
 
 ## Access classes
 
@@ -42,12 +42,16 @@ A and B are free wins. E, F, and G are where projects die.
 | **Argo GDAC** (`data-argo.ifremer.fr`) | in-situ T/S/pressure to 2000 m, QC flags | A |
 | **ERDDAP** (`coastwatch.pfeg.noaa.gov`) | `jplMURSST41` SST at 0.045°, 1,000+ griddap datasets | A |
 | **GEBCO / WOA23 / NDBC / HYCOM** | bathymetry, climatology, buoys, reanalysis | A/B |
+| **GLORYS12V1** (Copernicus Marine) | daily T/S/**currents**/SSH, 1/12°, 50 levels | **C** |
 
 The acoustic side is the strongest find: the SanctSound CI sites carry **13 labelled
 detection classes** (`ships`, `dolphins_1h`, three whale species, `bocaccio`,
 `pinnipeds`, `plainfinmidshipman`, `explosions`, `sonar`, …) with hourly 0/1 presence.
 
-Still gated behind a free account: **GLORYS12V1** (Class C) for the 4D T/S/current fields.
+**GLORYS12V1 is the only source supplying currents** — Argo has profiles but no
+velocity, ERDDAP has surface temperature only — so the Class C account is load-bearing
+for the "direction" metric. It shows a thermocline at 15.8 m that **moves 21 m across
+the month**, which is what makes the central SQL question answerable.
 
 ## Setup
 

@@ -3,7 +3,8 @@
 Hand-written judgements. An exit code says "the fetch worked"; this says whether the
 data is *usable* and what we should do about it.
 
-**Status: 7/7 Tier 1 probes green.** The gate (§7) is the one item still outstanding.
+**Status: 8/8 Tier 1 probes green, including the one Class C source.** The gate (§7) is
+the one item still outstanding.
 
 ---
 
@@ -130,6 +131,47 @@ Argo is **not** on the ERDDAP hosts checked (coastwatch, argo.ucsd.edu, data-arg
 
 ---
 
+## 8. GLORYS12V1 — PASS (the only Class C source, and it works)
+
+**Account works.** `copernicusmarine login` cached credentials to
+`~/.copernicusmarine/` — outside the repo. `.env` holds the credentials and is already
+gitignored. No credential has entered version control.
+
+Catalogue facts worth recording, because the default invocation is expensive and the
+CLI flags are not what you would guess:
+
+| Fact | Detail |
+|---|---|
+| Product id | `GLOBAL_MULTIYEAR_PHY_001_030` — this *is* GLORYS12V1 (1/12°, 50 levels) |
+| Datasets | `..._P1D-m` (daily), `..._P1M-m` (monthly), `..._climatology_P1M-m`, `..._static` |
+| **`describe` with no filter** | downloads a **170 MB** catalogue. Always pass `--contains` or `--product-id` |
+| CLI flags | `--end-datetime` (not `--stop-datetime`), `--file-format` / `--overwrite` (not `--output-format` / `--overwrite-existing`) |
+| Variables | advertised as **0** in the catalogue; discovered from the netCDF. Request `thetao`, `so`, `uo`, `vo`, `zos` by name |
+
+**What the data actually shows at Monterey, September 2019 — and this is the important part:**
+
+- 30 days × 19 levels over 0.5–55.8 m
+- Surface **15.6 °C** over deep **11.0 °C** — normal stratification
+- **Thermocline at 15.8 m**
+- **The thermocline moves 21.1 m across the month** (0.5 → 21.6 m)
+- Currents present: mean |u,v| = **0.041 m/s**, u up to 0.066, v up to 0.194
+
+That movement is what makes the central SQL question real. The plan's headline was
+*"when did the thermocline cross 40 m?"* — and at this site it never reaches 40 m in this
+month, but it crosses 10, 15, and 20 m, which is the same question with an answer in it.
+**The question needs restating for the site, not abandoning.** The duct ceiling above a
+40 m mooring therefore moves through the month, which is exactly the ducting behaviour
+worth studying.
+
+One artefact to watch: on some days the strongest gradient lands on the shallowest
+available level (0.5 m), which is a surface-grid artefact rather than a real
+thermocline. Depth-index tracking needs to ignore the first couple of levels.
+
+This is also the **only** probed source that supplies currents — Argo gives profiles but
+no velocity, and ERDDAP gives surface temperature only. So the "direction" metric from the
+original brief is available *only* from here, which is why Class C was worth registering
+for.
+
 ## Plan changes arising
 
 | Was | Now | Why |
@@ -139,14 +181,13 @@ Argo is **not** on the ERDDAP hosts checked (coastwatch, argo.ucsd.edu, data-arg
 | Argo by geographic box | **Copernicus `INSITU_GLO_TS_OA`** | no ERDDAP Argo; needs the Class C account |
 | binary labels (ship vs dolphin) | **multi-class, 13 classes** | far richer than assumed |
 | raw audio as the acoustic source | **detections + sound-level metrics first** | labels and HMD are the learning payload |
+| "when did the thermocline cross 40 m" | **"cross 10 / 15 / 20 m"** | at this site it reaches 21.6 m, not 40 m. Same question, with an answer in it |
 
 ## Outstanding
 
-- **The gate (§7 of the phase plan) is not done.** Load a month, plot time × depth, and
-  write down three questions. Everything above proves *access*; nothing yet proves
-  *interest*.
-- **Class C untested.** Copernicus registration and first subset. This is the only
-  friction-gated item left, and it blocks T/S/u/v/SSH. The fallback ladder holds without
-  it (ERDDAP SST + Argo GDAC), but those give surface temperature and profiles — not
-  currents, and not a full 4D field.
+- **The gate is not done.** Load a month, plot time × depth, write down three questions.
+  The GLORYS probe is most of the way there — thermocline at 15.8 m moving 21 m across
+  the month — but the plot and the three questions are the actual test.
+- **The ML question is untested.** Whether a one-line rule already solves the dolphin
+  labels decides whether that exercise is real or needs a self-defined target.
 - **Watkins, OBIS, Orcasound, ShipsEar, WOA23, GEBCO, NDBC, HYCOM** — Tier 2/3, not yet probed.

@@ -31,8 +31,33 @@
       "sst_missing": "nceiOisst21Agg,noaacwBLENDED,nceiErsst"
     },
     "note": "anonymous, no key, griddap index enumerates (first=ECMM_Atlantic_spotted_dolphin). SST available: jplMURSST41,NOAA_DHW (NOAA OISST absent from this host; jplMURSST41 at 0.045 deg is finer than OISST's 0.25 deg)",
-    "seconds": 4.95,
+    "seconds": 5.31,
     "slug": "erddap",
+    "status": "PASS"
+  },
+  "glorys": {
+    "detail": {
+      "depth_range_m": "0.5-55.8",
+      "dims": "time=31,depth=19,latitude=2,longitude=3",
+      "n_days": 31,
+      "n_depth": 19,
+      "speed_mean": 0.0409,
+      "thermocline_m": 15.8,
+      "thermocline_moves_m": 21.1,
+      "thermocline_range_m": "0.5-21.6",
+      "thermocline_strength_c_per_m": -0.1615,
+      "thetao_deep": 11.02,
+      "thetao_kb": 31.1,
+      "thetao_range": "10.48..16.81",
+      "thetao_surface": 15.62,
+      "u_mean": -0.02,
+      "u_range": "0.066",
+      "v_mean": 0.0356,
+      "v_range": "0.194"
+    },
+    "note": "Class C confirmed. 30 days x 19 levels over 0.5-55.8 m. Surface 15.62 C over deep 11.02 C. THERMOCLINE at 15.8 m, moving 21.1 m over the month (0.5-21.6 m). Currents present: mean |u,v| = 0.0409 m/s. The ducting work has real structure to work with.",
+    "seconds": 28.14,
+    "slug": "glorys",
     "status": "PASS"
   },
   "gsw": {
@@ -49,7 +74,7 @@
       "version": "3.6.23"
     },
     "note": "arm64 wheel, no compiler. units are degrees C (not Kelvin). c=1521 m/s at 20C, dcdT=3.2 m/s/degC, dcdp=16.5->17.7 m/s/1000dbar, sigma0=25.7",
-    "seconds": 0.0,
+    "seconds": 0.01,
     "slug": "gsw",
     "status": "PASS"
   },
@@ -69,7 +94,7 @@
       "ship_vars": "time_stamp,start_time,end_time,ships_presence"
     },
     "note": "dolphin labels: 2787 hourly rows, 1.22% positive (34/2787), contiguous. Severely imbalanced -> 'accuracy is a lie' is a REAL lesson here. CAVEAT: labels are PamGuard/LTSA-derived, not ground truth.",
-    "seconds": 0.32,
+    "seconds": 0.34,
     "slug": "ncei_labels",
     "status": "PASS"
   },
@@ -85,7 +110,7 @@
       "sanctsound_products": "detections,sound_clips,sound_level_metrics,sound_propagation_models"
     },
     "note": "public, anonymous, no key. 29 projects (sanctsound + mbarc_socal + dclde + nrs + soundcoop all present). Layout <project>/products/<type>/<site>/<dataset>/data/. NOTE: bare 'aws s3 ls' fails here -- local MinIO endpoint override.",
-    "seconds": 0.39,
+    "seconds": 0.48,
     "slug": "ncei_pad",
     "status": "PASS"
   },
@@ -105,7 +130,7 @@
       "valid": 13230
     },
     "note": "real Monterey SST, 30 days in Sept 2019, 14.37-17.02 C (mean 15.6). CSV and netCDF routes both work. Upwelling-consistent values.",
-    "seconds": 1.91,
+    "seconds": 4.9,
     "slug": "sst_erddap",
     "status": "PASS"
   },
@@ -118,7 +143,7 @@
       "postgres": "PostgreSQL 17.11",
       "time_bucket": [
         "2019-09-01:15.60",
-        "2019-09-02:15.61",
+        "2019-09-02:15.60",
         "2019-09-03:15.61"
       ],
       "timescaledb": "aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit"

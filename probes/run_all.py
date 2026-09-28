@@ -25,6 +25,7 @@ PROBE_MODULES = [
     "probe_05_ncei_pad",
     "probe_06_ncei_labels",
     "probe_07_argo",
+    "probe_08_glorys",
 ]
 
 MARK = {"PASS": "[x]", "FAIL": "[ ]", "WARN": "[~]"}
