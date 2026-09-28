@@ -13,7 +13,7 @@ Access classes: **A** anonymous HTTP · **B** anonymous, other protocol ·
 | [x] | **erddap** — ERDDAP griddap service (NOAA CoastWatch) | A | HTTP access to thousands of gridded ocean/atmospheric datasets | PASS in 7.4s |
 | [x] | **sst_erddap** — Sea surface temperature at Monterey Bay via ERDDAP (jplMURSST41) | A | daily analysed SST, 0.045 deg, 2002-present | PASS in 1.6s |
 | [x] | **toolchain** — PostgreSQL + TimescaleDB + psycopg + plotly | A | operational time-series store and interactive plotting | PASS in 0.2s |
-| [x] | **ncei_pad** — NOAA NCEI Passive Acoustic Data archive (GCS bucket) | A | raw hydrophone audio, sound-level metrics, and species/vessel detections | PASS in 1.0s |
+| [x] | **ncei_pad** — NOAA NCEI Passive Acoustic Data archive (GCS bucket) | A | raw hydrophone audio, sound-level metrics, and species/vessel detections | PASS in 0.6s |
 | [x] | **ncei_labels** — NCEI SanctSound detection labels (dolphin / ship) | A | hourly presence/absence labels per species and per vessel | PASS in 0.3s |
 | [x] | **argo_gdac** — Argo in-situ profiles via GDAC | A | T/S/pressure profiles to 2000 m, ~10-day cycles, with QC flags | PASS in 0.0s |
 | [x] | **glorys** — GLORYS12V1 global ocean reanalysis (Copernicus Marine) | C | daily T/S/currents/SSH, 1/12 deg, 50 levels, 1993-present | PASS in 28.4s |

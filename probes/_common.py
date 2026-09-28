@@ -53,61 +53,20 @@ PASS, FAIL, WARN = "PASS", "FAIL", "WARN"
 # ---------------------------------------------------------------------------
 # HTTP session
 # ---------------------------------------------------------------------------
-# This machine has AAAA records but no IPv6 route. curl races IPv4/IPv6
-# (Happy Eyeballs, RFC 8305) so it looks fast; urllib3/requests does not, and
-# waits out the full connect timeout on the dead IPv6 address before falling
-# back. Observed: every request to coastwatch.pfeg.noaa.gov took exactly
-# 20.0s (the timeout) and then succeeded -- a 20x slowdown on every call.
-#
-# Fix once, here, rather than in each probe. Prefer AF_INET by filtering
-# getaddrinfo, and set a sane (connect, read) timeout tuple so any future
-# stall fails fast instead of silently eating the whole probe.
+# The implementation lives in ocean_sim.http so that src/ocean_sim does not have to
+# import from probes/ -- the dependency was the wrong way round. Re-exported here for
+# the probes' convenience.
 
 def force_ipv4() -> bool:
-    """Restrict getaddrinfo to IPv4. Idempotent. Returns True if it patched."""
-    import socket
+    from ocean_sim.http import force_ipv4 as _f
 
-    if getattr(socket.getaddrinfo, "_ocean_sim_patched", False):
-        return False
-    _orig = socket.getaddrinfo
-
-    def _v4_only(host, port, *args, **kwargs):
-        infos = _orig(host, port, *args, **kwargs)
-        v4 = [i for i in infos if i[0] == socket.AF_INET]
-        return v4 or infos  # fall back to whatever we got if no A record
-
-    _v4_only._ocean_sim_patched = True  # type: ignore[attr-defined]
-    socket.getaddrinfo = _v4_only  # type: ignore[assignment]
-    return True
+    return _f()
 
 
-def http_session(retries: int = 3, backoff: float = 0.6):
-    """A requests.Session with IPv4 preference and fail-fast connect timeouts.
+def http_session(*args, **kwargs):
+    from ocean_sim.http import http_session as _s
 
-    Retries on transient failures (429, 5xx, connection resets). Probes hit public
-    services back to back, and ERDDAP in particular rate-limits: running the full suite
-    produced a spurious FAIL on ``sst_erddap`` that passed immediately when run alone.
-    A probe that reports FAIL for a 429 is reporting the network, not the data.
-    """
-    import requests
-    from requests.adapters import HTTPAdapter
-    from urllib3.util.retry import Retry
-
-    force_ipv4()
-    retry = Retry(
-        total=retries,
-        backoff_factor=backoff,
-        status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=frozenset({"GET", "HEAD"}),
-        raise_on_status=False,
-    )
-    sess = requests.Session()
-    adapter = HTTPAdapter(max_retries=retry, pool_connections=4, pool_maxsize=4)
-    sess.mount("https://", adapter)
-    sess.mount("http://", adapter)
-    sess.request_timeout = (6, 180)  # type: ignore[attr-defined]
-    return sess
-
+    return _s(*args, **kwargs)
 
 
 def cache_path(key: str, suffix: str = "") -> Path:

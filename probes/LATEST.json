@@ -130,7 +130,7 @@
       "sanctsound_products": "detections,sound_clips,sound_level_metrics,sound_propagation_models"
     },
     "note": "public, anonymous, no key. 29 projects (sanctsound + mbarc_socal + dclde + nrs + soundcoop all present). Layout <project>/products/<type>/<site>/<dataset>/data/. NOTE: bare 'aws s3 ls' fails here -- local MinIO endpoint override.",
-    "seconds": 1.02,
+    "seconds": 0.64,
     "slug": "ncei_pad",
     "status": "PASS"
   },

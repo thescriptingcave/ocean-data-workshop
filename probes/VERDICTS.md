@@ -184,6 +184,8 @@ for.
 | "when did the thermocline cross 40 m" | **"cross 10 / 15 / 20 m"** | at this site it reaches 21.6 m, not 40 m. Same question, with an answer in it |
 | hydrophone at 48 kHz | **96 kHz, 116 m deep, 16 km away** | from the metadata index; 48 kHz clips the dolphin click band |
 | wind from buoy 46042 | **wind from 46092 (MBM1), 10 km** | 46042's direction sensor was out for the entire window |
+| acoustic anchor in the Channel Islands | **MB01, Monterey Bay itself** | the metadata index put the nearest site 16 km away, in the same bay |
+| acoustic product unspecified | **third-octave `tol_1h`, never `psd_1h`** | 0.7 MB vs 456 MB per deployment |
 | September-only analysis window | **widen it** | 30 daily points is too few for the lag correlations we want; both sources allow longer |
 
 ## Outstanding
