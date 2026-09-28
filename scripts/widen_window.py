@@ -16,14 +16,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from ocean_sim.config import OCEAN_BOX, OCEAN_SITE  # noqa: E402
-from ocean_sim.data import glorys, ndbc  # noqa: E402
-from ocean_sim.stats import block_bootstrap_pvalue, effective_n  # noqa: E402
+from ocean_sim.config import OCEAN_BOX, OCEAN_SITE
+from ocean_sim.data import glorys, ndbc
+from ocean_sim.stats import block_bootstrap_pvalue, effective_n
 
 YEARS = list(range(2019, 2026))
 CACHE = "data/glorys_wide"
@@ -46,7 +45,6 @@ def ocean_daily() -> pd.DataFrame:
         OCEAN_BOX, start, end, CACHE,
     )
     ds = glorys.load(paths, label=f"{YEARS[0]}-{YEARS[-1]}")
-    depths = ds.depth.values
     return pd.DataFrame(
         {
             "t": pd.to_datetime(ds.time.values).floor("D"),
@@ -123,7 +121,7 @@ def main() -> int:
     # --- sensitivity: the p-values depend on the block length, so report the spread ---
     # A single block length is a choice. Where the answer flips with it, the finding is
     # not robust and must not be reported as if it were.
-    print(f"\n--- sensitivity to block length (is the verdict robust?) ---")
+    print("\n--- sensitivity to block length (is the verdict robust?) ---")
     print(f"{'driver':16} {'target':11} " + "".join(f"{b:>9}" for b in BLK) + "   robust?")
     unstable = []
     for dlabel, dcol in drivers.items():

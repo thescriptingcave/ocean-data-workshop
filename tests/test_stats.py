@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from ocean_sim.stats import (  # noqa: E402
+from ocean_sim.stats import (
     block_bootstrap_pvalue,
     effective_n,
     estimate_block_length,
