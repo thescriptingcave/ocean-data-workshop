@@ -20,14 +20,18 @@ import matplotlib
 matplotlib.use("Agg")  # headless: no window to draw into on a build agent
 import matplotlib.pyplot as plt
 import numpy as np
-import xarray as xr
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import cmocean  # noqa: E402
+import cmocean
 
-from ocean_sim.config import ACOUSTIC_ANCHOR, OCEAN_BOX, OCEAN_SITE, SEPT_2019  # noqa: E402
-from ocean_sim.data import glorys  # noqa: E402
+from ocean_sim.config import (
+    ACOUSTIC_ANCHOR,
+    OCEAN_BOX,
+    OCEAN_SITE,
+    SEPT_2019,
+)
+from ocean_sim.data import glorys
 
 FIGDIR = Path(__file__).resolve().parent.parent / "figures"
 FIGDIR.mkdir(exist_ok=True)
