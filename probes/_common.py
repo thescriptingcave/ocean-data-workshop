@@ -81,13 +81,28 @@ def force_ipv4() -> bool:
     return True
 
 
-def http_session():
-    """A requests.Session with IPv4 preference and fail-fast connect timeouts."""
+def http_session(retries: int = 3, backoff: float = 0.6):
+    """A requests.Session with IPv4 preference and fail-fast connect timeouts.
+
+    Retries on transient failures (429, 5xx, connection resets). Probes hit public
+    services back to back, and ERDDAP in particular rate-limits: running the full suite
+    produced a spurious FAIL on ``sst_erddap`` that passed immediately when run alone.
+    A probe that reports FAIL for a 429 is reporting the network, not the data.
+    """
     import requests
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
 
     force_ipv4()
+    retry = Retry(
+        total=retries,
+        backoff_factor=backoff,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset({"GET", "HEAD"}),
+        raise_on_status=False,
+    )
     sess = requests.Session()
-    adapter = requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=4)
+    adapter = HTTPAdapter(max_retries=retry, pool_connections=4, pool_maxsize=4)
     sess.mount("https://", adapter)
     sess.mount("http://", adapter)
     sess.request_timeout = (6, 180)  # type: ignore[attr-defined]
