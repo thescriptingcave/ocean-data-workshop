@@ -87,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
         ntotal += 1
         lines.append(
             f"| {MARK[d['status']]} | **{h.slug}** — {h.name} | {h.klass} | "
-            f"{h.provides} | {d['status']} in {d['seconds']:.1f}s |"
+            f"{h.provides} | {d['status']} in {d['seconds']:.1f}s |\n"
         )
     lines.append(f"\n**{npass}/{ntotal} passing.**\n")
 
