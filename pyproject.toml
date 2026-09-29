@@ -3,6 +3,8 @@ name = "ocean-sim"
 version = "0.1.0"
 description = "A hands-on workshop on retrieving real ocean data from public APIs, and on the traps in doing so."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 keywords = ["oceanography", "data-access", "teaching", "notebooks", "copernicus", "erddap"]
 classifiers = [

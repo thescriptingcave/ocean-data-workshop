@@ -1,0 +1,42 @@
+MIT License
+
+Copyright (c) 2026 Robert Harding
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+DATA IS NOT COVERED BY THIS LICENCE
+
+This licence covers the code in this repository only. The notebooks fetch data
+from external services, and that data is neither included nor licensed here.
+Each source carries its own terms, and they differ:
+
+  NOAA CoastWatch / ERDDAP (jplMURSST41)  NASA JPL MUR SST
+  NOAA NCEI passive acoustic archive       NOAA / U.S. Navy SanctSound
+  Argo float profiles                      Argo programme / Ifremer
+  NDBC station 46092                       NOAA NDBC
+  GLORYS12V1                               Copernicus Marine / Mercator Ocean
+
+None of it is redistributed here -- the repository contains a cache of HTTP
+responses so the workshop can run without a network, which is a convenience
+copy of public data, not a distribution of it. If you reuse a notebook,
+attribute the data to its provider and follow that provider's terms. The
+correct DOI to cite for each dataset is in the product documentation, and for
+GLORYS12V1 the DOI is given in the Copernicus product page.

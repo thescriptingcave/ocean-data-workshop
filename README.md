@@ -11,6 +11,9 @@ to interpret them, not to predict them.
 **→ [`GLOSSARY.md`](GLOSSARY.md)** — every term used, defined
 **→ [`notebooks/README.md`](notebooks/README.md)** — the ten-notebook workshop
 
+**MIT licensed** for the code — see [`LICENSE`](LICENSE). The data it fetches is not
+covered; see the bottom of that file.
+
 If you are contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md) — the notebooks are
 generated, do not edit the `.ipynb` files.
 

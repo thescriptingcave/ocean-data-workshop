@@ -287,10 +287,13 @@ GLOSSARY.md           every term used, defined
 
 ## Licence
 
-No licence has been chosen yet, which means "all rights reserved" by default — nobody may
-legally reuse this. If you are publishing it, add a `LICENSE` file and a `license` field
-in `pyproject.toml`. The code is original; the *data* it fetches is public and belongs to
-NOAA, NASA/JPL, Copernicus and the Argo programme, and carries its own terms.
+**MIT**, for the code. See [`LICENSE`](LICENSE).
+
+The *data* is not covered by it. Nothing is redistributed here — the repository holds an
+HTTP cache so the workshop can run without a network, which is a convenience copy of
+public data rather than a distribution of it. Each source carries its own terms, and if
+you reuse a notebook, attribute the data to its provider and follow that provider's
+licence. The list is at the bottom of the `LICENSE` file.
 
 ## Data sources
 
