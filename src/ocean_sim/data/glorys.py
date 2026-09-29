@@ -42,6 +42,16 @@ UNITS = {
 }
 
 
+def _env_with_credentials() -> dict:
+    """The child process environment, with credentials loaded from .env if needed."""
+    import os
+
+    from ..credentials import load
+
+    load()
+    return {**os.environ}
+
+
 def fetch(
     variables: list[str],
     box: dict,
@@ -84,7 +94,11 @@ def fetch(
             "--file-format", "netcdf",
             "--overwrite",
         ]
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        # Credentials reach the CLI as environment variables, which are the names
+        # `copernicusmarine login --help` documents. A value already in os.environ
+        # wins, so CI and explicit overrides are unaffected. Nothing is printed.
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800,
+                           env=_env_with_credentials())
         files = sorted(cache.glob(f"*{dataset_id}*{short}*.nc"))
         if r.returncode != 0 or not files:
             tail = (r.stderr or r.stdout).strip().splitlines()[-2:]

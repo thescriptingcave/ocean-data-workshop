@@ -2147,15 +2147,19 @@ import shutil
 import subprocess
 from pathlib import Path
 
-CRED_DIR = Path.home() / ".copernicusmarine"
+from ocean_sim.credentials import DOTENV, describe, load
+
 has_cli = shutil.which("copernicusmarine") is not None
-has_creds = CRED_DIR.exists() and any(CRED_DIR.iterdir())
+creds = load()
+where = (creds["source"] if (creds["complete"] or creds["login_blob_exists"]) else "NONE")
 
 print(f"  copernicusmarine CLI : {'found' if has_cli else 'NOT FOUND'}")
-print(f"  credentials in {CRED_DIR} : {'yes' if has_creds else 'no'}")
-print()
+print(f"  .env                 : {'found' if creds['dotenv_exists'] else 'not found'}")
+print(f"  credentials          : {where}")
+print(describe())
 
-READY = has_cli and has_creds
+READY = has_cli and (creds["complete"] or creds["login_blob_exists"])
+
 if READY:
     print("  -> running the live sections below.")
 else:
@@ -2165,9 +2169,16 @@ else:
     print("    1. Register: https://data.marine.copernicus.eu/register")
     print("    2. copernicusmarine login")
     print()
-    print("  `login` is interactive and stores the result in")
-    print(f"  {CRED_DIR}. Nothing in this repository reads a .env, and no")
-    print("  credential is committed -- that is deliberate, not an oversight.")
+    print("  Either:")
+    print(f"    1. put them in {DOTENV.name} (gitignored, and the loader reads it):")
+    print("         COPERNICUSMARINE_SERVICE_USERNAME=you@example.com")
+    print("         COPERNICUSMARINE_SERVICE_PASSWORD=...")
+    print("       then:  chmod 600 .env")
+    print("    2. or run `copernicusmarine login`, which is interactive and writes")
+    print("       the result to ~/.copernicusmarine/")
+    print()
+    print("  The variable names are not guessable: COPERNICUS_USERNAME and")
+    print("  COPERNICUS_PASSWORD are silently ignored. No credential is committed.")
 '''),
 
         md("""
@@ -2727,7 +2738,7 @@ def nb_00() -> object:
     n_traps = len(TRAPS)
     n_live = sum(1 for t in TRAPS if t[4] == "live")
     b = build(
-        md(f"""
+        md("""
 # 00 — Orientation
 
 **Written last, on purpose.** An introduction that describes material which does not
@@ -2854,7 +2865,7 @@ print("  cache        :", "warm" if _fetch.CACHE.exists() and any(_fetch.CACHE.g
       else "empty -- run scripts/prefetch.py")
 print("  offline mode :", _fetch.OFFLINE)
 '''),
-        md("""
+        md(f"""
 ## Two documents to have open
 
 * **`GETTING_STARTED.md`** — from nothing to running: prerequisites, the one setup
@@ -2890,7 +2901,9 @@ count, a physical range.
 
 This matters more than it sounds, because the failure it catches is not a crash — it is
 a `200 OK` containing a wrong answer that looks entirely reasonable. Notebook 09 lists
-**{n_traps} traps** found while building this material, and that habit is what would have
+**{n_traps} traps** found while building this material -- {n_live} of them reproduced against
+live services -- and that habit is what would have
+
 caught most of them in three seconds instead of an afternoon.
 """),
         code('''

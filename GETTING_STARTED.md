@@ -22,8 +22,34 @@ profile (temperature, salinity, currents).
 
 **Verified working without one.** On a machine with no account: the three anonymous
 sources load, all ten notebooks run, and Notebook 08's result is unaffected — it joins
-wind to acoustics, and neither needs an account. `setup` says so explicitly rather than
-failing, and points at the free registration. Nothing else needs a login.
+wind to acoustics, and neither needs an account. Nothing else needs a login.
+
+### Supplying the credentials
+
+Copy `.env.example` to `.env` and fill it in. `.env` is gitignored, and the loader reads
+it automatically — no login step, nothing to remember:
+
+```bash
+cp .env.example .env
+chmod 600 .env          # it holds a password
+```
+
+The two variable names are **not** guessable, and a wrong one is silently ignored:
+
+```
+COPERNICUSMARINE_SERVICE_USERNAME
+COPERNICUSMARINE_SERVICE_PASSWORD
+```
+
+A variable already in the environment always wins over `.env`, so CI can inject secrets
+without touching the working tree:
+
+```bash
+COPERNICUSMARINE_SERVICE_PASSWORD=... uv run python scripts/load_db.py
+```
+
+`copernicusmarine login` (interactive, writes to `~/.copernicusmarine/`) also works, and
+is the route to use if you would rather not have a password in the project directory.
 
 ### If you do not have Python
 

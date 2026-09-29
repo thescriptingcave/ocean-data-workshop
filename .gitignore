@@ -37,6 +37,10 @@ notebooks/_traps.csv
 # macOS
 .DS_Store
 probes/RESULTS.jsonl
+# one-off patch scripts. Several were committed by accident, which is how
+# this exists.
+scripts/_p*.py
+scripts/_patch*.py
 
 # figures are regenerable from scripts/; keep the HTML so they are
 # viewable without rerunning anything, but ignore the matplotlib PNGs

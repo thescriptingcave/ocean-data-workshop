@@ -103,8 +103,8 @@ is overconfident by roughly that factor.
 
 ## The trap table
 
-Notebook 09 lists **35 traps** found while building this material, and **none of them is
-in any documentation**. A sample:
+Notebook 09 lists **35 traps** found while building this material, **34 of them reproduced against
+live services**, and none of them documented anywhere. A sample:
 
 | trap | symptom |
 |---|---|
