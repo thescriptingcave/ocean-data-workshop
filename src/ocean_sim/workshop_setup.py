@@ -107,7 +107,7 @@ def run(cmd: list[str], *, timeout: int = 1800, check: bool = True,
 # 1. prerequisites
 # ---------------------------------------------------------------------------
 def check_prereqs() -> None:
-    step(1, 5, "Checking prerequisites")
+    step(1, 6, "Checking prerequisites")
 
     if shutil.which("docker"):
         r = run(["docker", "compose", "version"], check=False, quiet=True)
@@ -144,7 +144,7 @@ def check_prereqs() -> None:
 # 2. database
 # ---------------------------------------------------------------------------
 def start_db() -> None:
-    step(2, 5, f"Starting PostgreSQL + TimescaleDB on port {DB_PORT}")
+    step(2, 6, f"Starting PostgreSQL + TimescaleDB on port {DB_PORT}")
 
     env = {**os.environ, "OCEAN_SIM_PORT": str(DB_PORT), "OCEAN_SIM_PROJECT": PROJECT}
     r = subprocess.run(
@@ -188,7 +188,7 @@ def start_db() -> None:
 
 
 def apply_schema() -> None:
-    step(3, 5, "Applying schema")
+    step(3, 6, "Applying schema")
     run(["uv", "run", "python", "-c",
          "import sys,psycopg,pathlib;"
          "sys.path.insert(0,'src');"
@@ -201,13 +201,13 @@ def apply_schema() -> None:
 
 
 def load_data() -> None:
-    step(4, 5, "Loading data")
+    step(4, 6, "Loading data")
     warn("first run downloads ~15 MB and takes a few minutes. Later runs are near-instant.")
     run_visible(["uv", "run", "python", "scripts/load_db.py"])
 
 
 def prefetch() -> None:
-    step(5, 5, "Preparing API responses for the notebooks")
+    step(5, 6, "Preparing API responses for the notebooks")
 
     archive = ROOT / "notebooks" / "cache-archive.tar.gz"
     if archive.exists():
@@ -221,6 +221,35 @@ def prefetch() -> None:
 
 
 # ---------------------------------------------------------------------------
+def register_jupyter() -> None:
+    step(6, 6, "Registering the Jupyter kernel and checking Jupyter Lab")
+
+    # Needed, and easy to miss: `ipykernel` alone gives you a working *kernel* but no
+    # `jupyter lab` subcommand, and the kernel has to be registered under a name Jupyter
+    # will look for. Every one of these was a failure found by an attendee, not by the
+    # test suite -- `build_notebooks.py` uses nbclient directly and never needed any
+    # of it, so "10/10 execute clean" was true and still said nothing about whether
+    # anyone could open the notebooks.
+    r = run(
+        ["uv", "run", "python", "-m", "ipykernel", "install", "--user",
+         "--name", "python3", "--display-name", "Python 3 (ocean-sim)"],
+        check=False, quiet=True, timeout=120,
+    )
+    ok("kernel 'python3' registered" if r.returncode == 0
+       else "kernel install reported a problem (may already be registered)")
+
+    r = run(["uv", "run", "jupyter", "lab", "--version"], check=False, quiet=True, timeout=120)
+    if r.returncode != 0:
+        die(
+            "jupyter lab is not available",
+            "It should be a project dependency. Repair with:\n"
+            "    uv sync\n"
+            "then re-run. Until it is available you can still read the committed\n"
+            "notebooks, which are stored with their output.",
+        )
+    ok(f"jupyter lab {(r.stdout or '').strip().splitlines()[0]}")
+
+
 def main() -> int:
     global DB_PORT
     ap = argparse.ArgumentParser(description=__doc__,
@@ -253,9 +282,14 @@ def main() -> int:
     if not args.skip_fetch:
         prefetch()
 
+    if not args.skip_db:
+        register_jupyter()
+
     print("\n" + "=" * 72)
     ok(f"setup complete in {time.time() - t0:.0f} s")
-    print("\n  Next:  uv run jupyter lab notebooks/\n")
+    print("\n  Next:  uv run jupyter lab notebooks/")
+    print("\n  Offline, if the network is bad:  OCEAN_SIM_OFFLINE=1 uv run jupyter lab notebooks/")
+    print()
     return 0
 
 
