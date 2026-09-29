@@ -845,38 +845,60 @@ NOTEBOOKS = {
 }
 
 
-def force_ipv4() -> bool:
-    """Restrict getaddrinfo to IPv4, so a dead IPv6 route does not stall every fetch.
+# Written to a temporary directory and put on PYTHONPATH, so the *kernel* imports it at
+# startup. See kernel_ipv4_bootstrap for why it cannot just be called in this process.
+_IPV4_SITECUSTOMIZE = '''\
+"""Injected by scripts/build_beginners.py. Not part of Workshop Intro.
 
-    Duplicated from ``src/ocean_data_workshop/http.py`` on purpose. Importing it would
-    tie Workshop Intro to the rest of the repository, and the CI ``workshop intro`` job
-    installs only ``beginners/requirements.txt`` -- so an import here would break the
-    isolation that job exists to enforce.
+Restrict getaddrinfo to IPv4 so a dead IPv6 route does not stall every fetch.
+See scripts/build_beginners.py:kernel_ipv4_bootstrap for the full explanation.
+"""
 
-    Why it is needed: ``coastwatch.pfeg.noaa.gov`` publishes an AAAA record
-    (``2610:20:90a3:3bcc::15``) that some networks cannot route. urllib3 commits to the
-    first address and waits out the full connect timeout before falling back, so every
-    ERDDAP call costs 20s and can still fail outright. The two other sources are on
-    CloudFront and AWS, whose IPv6 works, which is why only ERDDAP broke in CI.
+import socket as _socket
 
-    Applied by the builder, never by the notebooks: the teaching code stays plain
-    ``requests``, because a reader's own network is their own problem to diagnose and
-    nothing here should hint that a workshop is secretly full of workarounds.
-    """
-    import socket
-
-    if getattr(socket.getaddrinfo, "_beginners_ipv4_patched", False):
-        return False
-    orig = socket.getaddrinfo
+if not getattr(_socket.getaddrinfo, "_beginners_ipv4_patched", False):
+    _orig = _socket.getaddrinfo
 
     def _v4_only(host, port, *args, **kwargs):
-        infos = orig(host, port, *args, **kwargs)
-        v4 = [i for i in infos if i[0] == socket.AF_INET]
+        infos = _orig(host, port, *args, **kwargs)
+        v4 = [i for i in infos if i[0] == _socket.AF_INET]
         return v4 or infos  # fall back to whatever we got if there is no A record
 
-    _v4_only._beginners_ipv4_patched = True  # type: ignore[attr-defined]
-    socket.getaddrinfo = _v4_only  # type: ignore[assignment]
-    return True
+    _v4_only._beginners_ipv4_patched = True
+    _socket.getaddrinfo = _v4_only
+'''
+
+
+def kernel_ipv4_bootstrap() -> str | None:
+    """Make the executing kernel prefer IPv4, and return the directory holding it.
+
+    Why this exists, since the obvious version does not work: ``NotebookClient`` runs
+    each notebook in a **separate kernel process**, so patching ``socket.getaddrinfo`` in
+    this process achieves nothing. Measured on a machine with the same dead IPv6 route
+    as the CI runner, with the patch applied here: the fetch still took 63.9 s, and the
+    kernel reported the patch as absent. The first attempt at this fix failed CI for
+    exactly that reason.
+
+    A ``sitecustomize`` module on ``PYTHONPATH`` is imported by every CPython process
+    during ``site`` initialisation, kernel included, and the kernel inherits this
+    process's environment. That is the one injection point which reaches it.
+
+    Kept out of the notebooks deliberately. The teaching code stays plain ``requests``,
+    because a reader's own network is their own to diagnose, and a workshop that looks
+    like a pile of workarounds is the thing this tier exists to stop being.
+
+    The body is duplicated from ``src/ocean_data_workshop/http.py`` rather than imported:
+    importing it would tie Workshop Intro to the rest of the repository and break the
+    isolation the CI ``workshop intro`` job exists to enforce. This copy is stdlib only.
+    """
+    import os
+    import tempfile
+
+    d = tempfile.mkdtemp(prefix="beginners-ipv4-")
+    (Path(d) / "sitecustomize.py").write_text(_IPV4_SITECUSTOMIZE)
+    existing = os.environ.get("PYTHONPATH", "")
+    os.environ["PYTHONPATH"] = f"{d}{os.pathsep}{existing}" if existing else d
+    return d
 
 
 def main() -> int:
@@ -907,8 +929,8 @@ def main() -> int:
 
     from nbclient import NotebookClient
 
-    if force_ipv4():
-        print("  (forcing IPv4: the ERDDAP host publishes an unroutable AAAA record)")
+    boot = kernel_ipv4_bootstrap()
+    print(f"  (kernel IPv4 bootstrap in {boot})")
 
     print()
     failed = []
@@ -921,7 +943,7 @@ def main() -> int:
                 resources={"metadata": {"path": str(OUT)}},
             ).execute()
             errs = [
-                (i, o.get("ename", "?"), (o.get("evalue") or "")[:60])
+                (i, o.get("ename", "?"), (o.get("evalue") or "")[:200])
                 for i, c in enumerate(nb.cells)
                 for o in c.get("outputs", []) if o.get("output_type") == "error"
             ]
@@ -939,7 +961,7 @@ def main() -> int:
                 and not c.get("outputs")
             ]
         except Exception as exc:
-            errs = [(-1, type(exc).__name__, str(exc)[:60])]
+            errs = [(-1, type(exc).__name__, str(exc)[:200])]
             silent = []
         nbf.write(nb, str(p))          # write back regardless: the error is the output
         if errs:
