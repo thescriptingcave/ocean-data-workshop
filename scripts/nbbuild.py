@@ -34,26 +34,35 @@ FAST_LANE = """> **Fast lane.** If you are comfortable with raw HTTP, start at t
 > marked *three ways, step 2*. You will lose nothing by skipping the curl cell."""
 
 
-def md(text: str) -> Any:
-    """A markdown cell. Trailing whitespace is stripped so the JSON stays clean."""
-    return nbf.v4.new_markdown_cell(text.strip("\n"))
+def md(text: str) -> list:
+    """A markdown cell, as a list, so cells can be composed without special cases."""
+    return [nbf.v4.new_markdown_cell(text.strip("\n"))]
 
 
-def code(text: str, *, fast_lane: bool = False) -> Any:
-    """A code cell, optionally prefixed with the skip-ahead note."""
-    if fast_lane:
-        text = f"{FAST_LANE}\n\n" + text
-    return nbf.v4.new_code_cell(text.strip("\n"))
+def code(text: str, *, fast_lane: bool = False) -> list:
+    """A code cell, optionally preceded by the skip-ahead note.
+
+    The note is a *separate markdown cell*. It cannot be prepended as a comment: the
+    original version did that and produced a cell beginning with ``> **Fast lane**``,
+    which is a SyntaxError rather than a note.
+    """
+    cells = md(FAST_LANE) if fast_lane else []
+    cells.append(nbf.v4.new_code_cell(text.strip("\n")))
+    return cells
 
 
-def raw(text: str) -> Any:
-    return nbf.v4.new_raw_cell(text.strip("\n"))
+def raw(text: str) -> list:
+    return [nbf.v4.new_raw_cell(text.strip("\n"))]
 
 
 def build(*cells: Any, title: str) -> nbf.NotebookNode:
-    """Assemble a notebook. The first markdown cell becomes the title."""
+    """Assemble a notebook from cells and/or lists of cells."""
+    flat: list = []
+    for c in cells:
+        flat.extend(c if isinstance(c, list) else [c])
+
     nb = nbf.v4.new_notebook()
-    nb.cells = list(cells)
+    nb.cells = flat
     nb.metadata = {
         "kernelspec": {
             "display_name": "Python 3",
