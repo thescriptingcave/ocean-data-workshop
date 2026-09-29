@@ -27,10 +27,8 @@ shipping and wind noise, small enough to hold a year in memory. For a first pass
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-import numpy as np
 import xarray as xr
 
 BUCKET = "noaa-passive-bioacoustic"
@@ -143,7 +141,7 @@ def band_summary(ds: xr.Dataset) -> dict:
     return out
 
 
-def detection_frame(csv_path: Path) -> "pd.DataFrame":  # noqa: F821
+def detection_frame(csv_path: Path) -> pd.DataFrame:  # noqa: F821
     """Load a SanctSound detection CSV (hourly presence/absence) as a tidy frame."""
     import pandas as pd
 

@@ -30,7 +30,6 @@ Format notes that cost time to rediscover:
 from __future__ import annotations
 
 import gzip
-import io
 from pathlib import Path
 
 import numpy as np
