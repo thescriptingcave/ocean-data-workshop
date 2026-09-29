@@ -458,7 +458,7 @@ print("  Had any of these failed, the number would have been wrong, not the plot
 # ===========================================================================
 # 02 -- REST griddap
 # ===========================================================================
-def nb_02() -> "object":
+def nb_02() -> object:
     b = build(
         md("""
 # 02 — Query a grid, dimensionally
@@ -706,7 +706,7 @@ print("  A mean outside 12-20 C would mean the wrong box or the wrong month.")
 # ===========================================================================
 # 03 -- Cloud object storage
 # ===========================================================================
-def nb_03() -> "object":
+def nb_03() -> object:
     b = build(
         md("""
 # 03 — List a bucket, fetch one object
@@ -823,11 +823,18 @@ confusing: the path that lists is not the path that fetches.
 wrong = S.ncei_file_url("tol_1h", "01").replace("/data/", "/")
 print("  wrong URL:", wrong.rsplit("/", 1)[-1], "at the wrong level")
 print()
-try:
-    _fetch.get(wrong, refresh=True)
-except RuntimeError as exc:
-    for line in str(exc).splitlines()[:4]:
-        print("   ", line)
+# refresh=True on purpose: this cell exists to show a *live* failure, so falling back
+# to a cache entry would defeat it. That also means it cannot run offline.
+if _fetch.OFFLINE:
+    print("  skipped -- offline mode. The server's response is reproduced below.")
+    print("   HTTP 404")
+    print("   <Error><Code>NoSuchKey</Code><Message>The specified key does not exist.")
+else:
+    try:
+        _fetch.get(wrong, refresh=True)
+    except RuntimeError as exc:
+        for line in str(exc).splitlines()[:4]:
+            print("   ", line)
 print()
 print("  Notice: the HTTP status is 404, but the payload says NoSuchKey. Nothing in")
 print("  the status code distinguishes 'you are not allowed' from 'that is not the")
@@ -961,7 +968,7 @@ print("  a decoding problem, not a quiet ocean.")
 # ===========================================================================
 # 04 -- Browsable tree + netCDF
 # ===========================================================================
-def nb_04() -> "object":
+def nb_04() -> object:
     b = build(
         md("""
 # 04 — Browse a tree, read netCDF
@@ -1268,7 +1275,7 @@ print("  200 C, you have a scale, a fill-value or a QC problem.")
 # ===========================================================================
 # 06 -- Fixed-format text
 # ===========================================================================
-def nb_06() -> "object":
+def nb_06() -> object:
     b = build(
         md("""
 # 06 — Parse fixed-format text
@@ -1523,5 +1530,1176 @@ print("  circular mean agree, either the wind did not cross north, or your circu
 print("  mean is not doing anything. They should differ.")
 '''),
         title="06 NDBC fixed format",
+    )
+    return b
+
+
+# ===========================================================================
+# 07 -- When a library beats a request
+# ===========================================================================
+def nb_07() -> "object":
+    b = build(
+        md("""
+# 07 — When a library beats a request
+
+**Access pattern: a domain library.** Everything so far has been about getting bytes
+across a network and decoding them yourself. Sometimes the right move is to stop.
+
+This is a short notebook with one idea in it: **know when the library is right, and
+know which of its units it will not tell you about.**
+"""),
+        *preamble(),
+
+        md("""
+## The calculation
+
+TEOS-10 sound speed needs three inputs, and getting the *kind* of each one wrong is
+silent:
+
+| symbol | meaning | units |
+|---|---|---|
+| `SA` | Absolute Salinity | g/kg |
+| `CT` | Conservative Temperature | **°C** |
+| `p` | pressure | dbar |
+
+We will compute sound speed and its pressure derivative for a real profile — the Argo
+one from Notebook 04.
+"""),
+        code('''
+import gsw
+import xarray as xr
+
+# Fetched here rather than assumed from Notebook 04, so this notebook runs on its
+# own. Every notebook in the workshop is independently runnable; people skip around.
+argo_path = Path.cwd() / "_argo_1900063_prof.nc"
+if not argo_path.exists():
+    argo_path.write_bytes(_fetch.get(S.ARGO_FILES["prof"], quiet=True).content)
+ds = xr.open_dataset(argo_path)
+prof = 0
+dbar = ds.PRES.isel(N_PROF=prof).values
+temp_c = ds.TEMP.isel(N_PROF=prof).values
+sp = ds.PSAL.isel(N_PROF=prof).values
+ok = ~np.isnan(dbar) & ~np.isnan(temp_c) & ~np.isnan(sp)
+dbar, temp_c, sp = dbar[ok], temp_c[ok], sp[ok]
+
+lon = np.full_like(dbar, -22.0)
+lat = np.full_like(dbar, 26.0)
+
+# Practical Salinity -> Absolute Salinity. Needs pressure AND position, which is the
+# part people miss: SA is not a function of SP alone.
+SA = gsw.SA_from_SP(sp, dbar, lon, lat)
+c = gsw.sound_speed(SA, temp_c, dbar)
+
+print(f"  SP {sp.min():.3f} - {sp.max():.3f} PSU")
+print(f"  SA {SA.min():.3f} - {SA.max():.3f} g/kg   (SA - SP = {np.mean(SA - sp):+.3f})")
+print(f"  sound speed {c.min():.1f} - {c.max():.1f} m/s")
+'''),
+
+        md("""
+### ⚠️ Trap — `gsw` takes **degrees Celsius**, and Kelvin returns NaN
+
+`CT` is Conservative Temperature in **degrees Celsius**. Pass Kelvin and you get:
+
+```
+gsw.sound_speed(SA, CT + 273.15, p)   ->  array([nan, nan, nan])
+RuntimeWarning: invalid value encountered in sound_speed
+```
+
+It does not raise, it does not warn about units, and it does not return a wrong number —
+it returns `nan`, which then propagates silently through every mean, plot and regression
+downstream. This is the most dangerous failure mode in the whole workshop because
+nothing ever looks wrong.
+
+`gsw` also has a dedicated module that *does* take Kelvin — `gsw.CT_from_t` — and the
+two look almost identical at the call site.
+"""),
+        code('''
+kelvin_result = gsw.sound_speed(SA, temp_c + 273.15, dbar)
+print("  CT in degrees C  ->", f"{c[0]:.1f} m/s   (real)")
+print("  CT in Kelvin     ->", f"{kelvin_result[0]:.1f} m/s   (nan, no exception)")
+print()
+print("  The correct way to convert, if you truly have Kelvin:")
+ct_from_kelvin = gsw.CT_from_t(SA, temp_c + 273.15, p=0)
+print("   gsw.CT_from_t(SA, T_K, p=0) ->", f"{float(ct_from_kelvin[0]):.2f} degC")
+'''),
+
+        md("""
+### ⚠️ Trap — `SA` is not a rename for `SP`
+
+| | |
+|---|---|
+| `SP` | **P**ractical Salinity — what your instrument reports, reference 35 PSU |
+| `SA` | **A**bsolute Salinity — g/kg, for use in physical equations |
+
+They differ by roughly 0.17 g/kg in the North Atlantic, and the difference is a function
+of **pressure and position** as well as salinity. `gsw.SA_from_SP` needs all three.
+
+This is not pedantry. Sound speed is a function of `SA`, not `SP`, and using `SP`
+directly is a units error that changes the answer at the fourth significant figure —
+small enough to survive review, large enough to be wrong.
+
+### ⚠️ Trap — `dc/dp` is about 17 m/s per 1000 dbar, not 1700
+
+Sound speed rises with pressure at roughly **1.7 cm/s per dbar**, which is
+**~17 m/s per 1000 dbar**. A factor-of-100 slip gives you 17 km/s, which is obviously
+wrong — but if you never look at the magnitude, and you are differencing two numbers
+that are both ~1500, the result is a plausible-looking small number either way.
+"""),
+        code('''
+# dc/dp, the right way and the wrong way.
+dcdp_1000 = gsw.sound_speed(SA, temp_c, dbar + 1000) - c
+print("  dc/dp per 1000 dbar:")
+print(f"    mean  {dcdp_1000.mean():+.3f} m/s")
+print(f"    range {dcdp_1000.min():+.3f} .. {dcdp_1000.max():+.3f} m/s")
+print()
+print("  per dbar, that is", f"{dcdp_1000.mean() / 1000:+.5f} m/s/dbar", "= 1.7 mm/s per dbar")
+print()
+print("  If you had remembered 'about 1.5 m/s per 10 m of depth' -- which is the same")
+print("  number said in different units -- and applied it per dbar instead of per")
+print("  1000 dbar, you would be wrong by a factor of 100. Always state the units of")
+print("  the quantity you are comparing against.")
+'''),
+
+        md("""
+## 2. Store derived values *besides* raw ones
+
+Not a trap exactly — a practice, and the reason this project's schema has both
+`raw_temperature_c` and `sound_speed_mps` columns.
+
+If you overwrite a measured value with a derived one, nobody downstream — including you
+in three months — can tell which is which, and cannot re-derive it under a different
+convention. Two columns cost nothing. One column plus a wrong assumption costs a rebuild.
+"""),
+        code('''
+# The pattern the project uses, in miniature.
+derived = pd.DataFrame({
+    "pressure_dbar": dbar,          # raw
+    "temperature_c": temp_c,        # raw
+    "salinity_psu": sp,             # raw
+    "salinity_abs_gkg": SA,         # derived
+    "sound_speed_mps": c,           # derived
+}).round(4)
+print(derived.head(6).to_string(index=False))
+print("  ...")
+print()
+print("  Five columns, three measured. A reader cannot confuse them.")
+'''),
+        code('''
+fig, axes = plt.subplots(1, 2, figsize=(11.5, 5.5), constrained_layout=True)
+
+axes[0].plot(c, dbar, color="#1b3a5c", lw=1.6)
+axes[0].set_xlabel("sound speed  (m/s)")
+axes[0].set_ylabel("pressure  (dbar)")
+axes[0].set_title("TEOS-10 sound speed", loc="left", fontweight="bold")
+axes[0].invert_yaxis()
+
+axes[1].plot(dcdp_1000, dbar, color="#c0392b", lw=1.6)
+axes[1].axvline(0, color="#888", lw=0.8, ls="--")
+axes[1].set_xlabel("dc/dp  (m/s per 1000 dbar)")
+axes[1].set_title(f"mean {dcdp_1000.mean():.1f} m/s per 1000 dbar",
+                  loc="left", fontweight="bold")
+axes[1].invert_yaxis()
+
+plt.show()
+'''),
+        md("""
+Sound speed rises monotonically with depth, and `dc/dp` is nearly constant — which is
+the whole reason sound speed is such a good vertical coordinate in ocean acoustics. A
+mixed layer has a nearly constant sound speed and reflects; a thermocline is a sound
+speed gradient and refracts. That is the mechanism behind every whale-sound and
+shipping-noise detection, and it is why `dc/dp` being wrong would not be a cosmetic
+error.
+
+### And when a library is *not* the answer
+
+`argopy` would have been the obvious choice for Argo, and it is currently broken against
+`erddapy` 3.x (Notebook 04). A library that requires you to pin `erddapy<3` and
+downgrade `xarray` to work, in order to read plain netCDF over HTTPS, is not saving you
+time. Check the maintenance cost, not just the import.
+"""),
+        code('''
+_fetch.expect_range("sound speed", float(c.min()), 1450.0, 1550.0)
+_fetch.expect_range("sound speed", float(c.max()), 1450.0, 1550.0)
+_fetch.expect_range("dc/dp per 1000 dbar", float(dcdp_1000.mean()), 15.0, 19.0)
+_fetch.expect_range("SA - SP", float(np.mean(SA - sp)), 0.0, 0.5)
+_fetch.expect("Kelvin gives NaN", bool(np.isnan(kelvin_result[0])), True)
+print()
+print("  1480-1520 m/s is seawater. 290 m/s is air, 340 m/s is fresh water.")
+print("  dc/dp of 15-19 m/s per 1000 dbar is the accepted value.")
+print("  SA - SP of 0-0.5 g/kg in the Atlantic; it is closer to zero in the Pacific.")
+print("  And the last one is the check that would have caught the Kelvin mistake")
+print("  instantly, instead of three notebooks later.")
+'''),
+        title="07 gsw domain library",
+    )
+    return b
+
+
+# ===========================================================================
+# 09 -- The trap table
+# ===========================================================================
+TRAPS: list[tuple] = [
+    # (where, what breaks, symptom, fix, verified)
+    ("01/02 ERDDAP", "CSV has a names row AND a units row",
+     "first row of strings; off-by-one on every row after",
+     "pd.read_csv(..., skiprows=[1])", "live"),
+    ("01 ERDDAP", "index expression is part of the parameter NAME, not its value",
+     "500 destinationVariableName=... wasn't found -- from either mistake",
+     "hand-build the query string; params= cannot express it", "live"),
+    ("01 ERDDAP", "curl reads [ ] as a glob pattern",
+     "exit code 3, URL malformat, and NO message under -s",
+     "curl -g / --globoff", "live"),
+    ("02 ERDDAP", ".time=first / .lat=first are a no-op",
+     "byte-identical response; you get 520x the data you asked for",
+     "shrink the lat/lon box instead", "live"),
+    ("02 ERDDAP", "constraint variables (&time=) rejected in griddap",
+     "400: '&' must be followed by a .griddap server variable",
+     "use the index form only", "live"),
+    ("02 ERDDAP", "strides in the index [(0):(1):(29)] rejected",
+     "400: For variable=... axis#0=time Constraint=...",
+     "no strides exist; shrink the box", "live"),
+    ("02 ERDDAP", "grid coordinates are float32",
+     "latitude.max() = 36.81999969 is 'outside' the box you asked for",
+     "compare with a 1e-3 tolerance, never exactly", "live"),
+    ("02 ERDDAP", "NaN fill is skipped by reductions; -999.0 fill is not",
+     "mean silently wrong, no error",
+     "check the min, and mask explicitly", "live"),
+    ("02 ERDDAP", "large CSV responses are paged",
+     "page 2 without page 1 returns empty with HTTP 200",
+     "request pages in order", "documented"),
+    ("01-07 any", "AAAA records but no IPv6 route",
+     "requests ~100x slower than curl; every call takes exactly the timeout",
+     "force AF_INET (the workshop helper does this)", "live"),
+    ("03 GCS", "the data/ level is mandatory when FETCHING",
+     "404 with <Code>NoSuchKey</Code> -- reads as a permissions problem",
+     "include /data/ in the object key", "live"),
+    ("03 GCS", "error bodies are XML even from the JSON API",
+     "r.json() raises JSONDecodeError, hiding the real message",
+     "raise_for_status() then read r.text", "live"),
+    ("03 GCS", "three capitalisations in one path",
+     "directory all-lower, file title-case, trailing unit lower: TOL_1h not TOL_1H",
+     "copy a real listing, do not construct names by upper()", "live"),
+    ("03 GCS", "aws s3 honours ~/.aws/config",
+     "commands silently redirected to a local MinIO on localhost:9000",
+     "use the GCS JSON API -- no profile, no region, no credentials", "live"),
+    ("03 GCS", "same recording at four resolutions",
+     "psd_1h is ~456 MB against tol_1h at ~0.7 MB",
+     "list first, read the size, then download", "live"),
+    ("04 Argo", "N_PARAM is in ds.sizes but unused by TEMP/PSAL/PRES",
+     "ValueError on isel, or a silently wrong selection if you ignore it",
+     "check .shape before indexing", "live"),
+    ("04 Argo", "QC flags are bytes in _prof.nc, int8 in per-cycle files",
+     "(qc == 1) is silently all-False",
+     "decode to int first; count the codes, do not use .all()", "live"),
+    ("04 Argo", "no index and no search API over 4,261 floats",
+     "/index/, /dac/index/, _prof_index.txt all 404",
+     "plan for screening, or use a source that has an index", "live"),
+    ("04 Argo", "no small file holds a float's position",
+     "_meta.nc (35 KB) and _tech.nc (2.8 MB) both lack LATITUDE",
+     "position is in _prof.nc; screening costs 689 KB per candidate", "live"),
+    ("04 Argo", "argopy is broken against erddapy 3.x",
+     "imports the removed _quote_string_constraints",
+     "fetch GDAC netCDF directly; do not downgrade xarray", "live"),
+    ("06 NDBC", "line 0 is names, line 1 is units, data starts at line 2",
+     "columns named #yr, mo, dy; KeyError much later",
+     "parse lines[0], slice from lines[2]", "live"),
+    ("06 NDBC", "resolution is not uniform within a year file",
+     "7,835 rows for 2019, not 8,760; file starts 5 January",
+     "resample explicitly; never assume hourly", "live"),
+    ("06 NDBC", "sentinels are per column, and 99 is a valid bearing",
+     "a blanket >= 99 filter deletes real easterly winds",
+     "mask per column: 99 generally, 999 for WDIR/MWD", "live"),
+    ("06 NDBC", "RangeIndex Series into DataFrame(index=DatetimeIndex)",
+     "aligns on index; every column silently NaN",
+     "pass .to_numpy() so values are positional", "live"),
+    ("06 NDBC", "wind direction is FROM, and bearings wrap",
+     "mean(350, 10) = 180, the exact opposite of 0; 79.6 deg error over 2019",
+     "average the u/v vectors, then atan2", "live"),
+    ("07 gsw", "Conservative Temperature is degrees C, not Kelvin",
+     "returns nan with only a RuntimeWarning; propagates silently",
+     "pass degC, or convert with gsw.CT_from_t", "live"),
+    ("07 gsw", "SA is not SP",
+     "SA_from_SP needs pressure AND position; ~0.17 g/kg apart",
+     "use gsw.SA_from_SP(sp, p, lon, lat)", "live"),
+    ("07 gsw", "dc/dp is ~17 m/s per 1000 dbar",
+     "a per-dbar reading of a per-1000 quantity is 100x wrong",
+     "state the units of whatever you are comparing against", "live"),
+    ("05 Copernicus", "describe with no filter returns a 170 MB catalogue",
+     "multi-minute hang on a 'describe' call",
+     "always pass --dataset-id and a filter", "live"),
+    ("05 Copernicus", "the flag is --end-datetime",
+     "not --stop-datetime, which is rejected",
+     "check --help; the CLI is not consistent across tools", "live"),
+    ("05 Copernicus", "advertised variable count is reported as 0",
+     "a correct dataset that looks empty",
+     "do not trust the summary; request variables explicitly", "live"),
+    ("08 SQL", "Postgres names every avg() result 'avg'",
+     "three averages in one SELECT produce duplicate column names",
+     "alias every aggregate explicitly", "live"),
+    ("08 SQL", "int(31.5) uses banker's rounding",
+     "31.5 Hz becomes band_32hz, 62.5 would become band_62hz",
+     "state the rule, and test the boundary case", "live"),
+]
+
+
+def nb_09() -> "object":
+    rows_md = "\n".join(
+        f"| {i} | {w} | {sym} | {fix} | {v} |"
+        for i, (w, breaks, sym, fix, v) in enumerate(TRAPS, 1)
+    )
+    by_where: dict[str, int] = {}
+    for w, *_ in TRAPS:
+        by_where[w] = by_where.get(w, 0) + 1
+
+    b = build(
+        md(f"""
+# 09 — The trap table
+
+**Reference, not taught.** Nobody runs this in a workshop. It is the thing people keep.
+
+Every entry here cost real time, and **not one of them is in any documentation**. That
+is the reason this workshop exists as a workshop and not a link list: the APIs are
+documented, the *failure modes* are not.
+
+**{len(TRAPS)} traps.** {sum(1 for t in TRAPS if t[4] == 'live')} were reproduced against
+live services while writing these notebooks; the rest are marked accordingly.
+"""),
+        md("""
+## How to use this
+
+When something is wrong and you do not know why, come here and match on the **symptom**,
+not on the cause. Symptoms are what you have; causes are what you are trying to find.
+
+The `live` column means the failure was reproduced and the fix verified. `documented`
+means it is a known property of the service rather than something re-derived here.
+"""),
+        *preamble(),
+        code(f'''
+# The same table, machine-readable -- so you can grep it.
+traps = pd.DataFrame(
+    [
+        {",\n        ".join(repr(t) for t in TRAPS)},
+    ],
+    # NOT "where": DataFrame.where is a method, so traps.where silently resolves
+    # to the method rather than the column. A column name that shadows an API is
+    # a trap in its own right, which is a slightly embarrassing way to make this
+    # table.
+    columns=["source", "what_breaks", "symptom", "fix", "verified"],
+)
+traps.index.name = "id"
+print(f"  {{len(traps)}} traps")
+print()
+print("  by source:")
+for src, n in traps.source.value_counts().items():
+    print(f"    {{src:22}} {{n}}")
+print()
+print("  verified live:", int((traps.verified == "live").sum()))
+traps.to_csv("_traps.csv", index=False)
+print("  written to _traps.csv")
+'''),
+        md(f"""
+## The full list
+
+| # | where | what breaks | symptom | fix | |
+|---|---|---|---|---|---|
+{rows_md}
+"""),
+        md("""
+## The patterns behind them
+
+Thirty-odd traps look like a list of accidents. They are not — they cluster into five
+recurring shapes, and recognising a shape is faster than memorising a symptom.
+
+### 1. A unit or convention mismatch that returns `nan` instead of raising
+`gsw` with Kelvin. Fill values in a mean. A sentinel treated as data. Nothing errors;
+everything downstream is quietly wrong. **This is the expensive class**, because the
+symptom appears minutes or notebooks later, far from the cause. Defence: assert on
+physical ranges at the point of computation, not at the end.
+
+### 2. A path or name that is right in every part except one
+`data/` missing. `TOL_1H` for `TOL_1h`. `line[1]` for `line[0]`. One wrong component, a
+generic error message, and a strong pull towards debugging the wrong thing. Defence:
+copy real values out of a real listing rather than constructing them.
+
+### 3. A feature that exists in the examples and does nothing
+`.time=first`. A no-op that returns 200 and plausible data. **The most dangerous class**,
+because the absence of an error reads as confirmation. Defence: state the expected size
+and row count, and check both.
+
+### 4. Silent index alignment
+`RangeIndex` into a timestamped frame. `object` dtype compared to `int`. Both return
+something of the right shape, filled with the wrong thing. Defence: check `.dtype` and
+`.shape` before trusting an array.
+
+### 5. A library hiding the mechanism
+`requests` and `curl` disagree about the same URL, and neither is obviously wrong,
+because one of them is quietly dropping your parameter. Defence: when two tools
+disagree, look at the bytes on the wire — that is what Notebook 01 is for.
+
+## The one habit that would have prevented most of these
+
+**State what you expect before you fetch, then assert it.** A response size, a row
+count, a physical range. That is the whole discipline behind every `expect()` call in
+this workshop, and it converts an afternoon of debugging into a three-second failure.
+
+The failure it catches is not a crash. It is a `200 OK` containing a wrong answer that
+looks entirely reasonable — which is the only kind of data bug that ever costs anyone a
+day.
+"""),
+        code('''
+# The habit, in one line.
+def fetch_checked(url, *, expect_bytes=None, expect_rows=None, params=None):
+    """Fetch, then immediately prove the response is what you said it would be."""
+    r = _fetch.get(url, params)
+    if expect_bytes is not None:
+        _fetch.expect("bytes", len(r.content), expect_bytes)
+    if expect_rows is not None:
+        _fetch.expect("rows", len(r.text.splitlines()) - 2, expect_rows)
+    return r
+
+r = fetch_checked(S.sst_csv(point=True), expect_bytes=1324, expect_rows=30)
+print("  a 1,324-byte, 30-row response. Anything else and we stop here,")
+print("  before building anything on top of it.")
+'''),
+        title="09 Trap table",
+    )
+    return b
+
+
+# ===========================================================================
+# 05 -- Credentialed API
+# ===========================================================================
+def nb_05() -> "object":
+    b = build(
+        md("""
+# 05 — Authenticate, then query
+
+**Access pattern: a credentialed API with a catalogue.** Everything so far was
+anonymous. This one is not.
+
+The Copernicus Marine Service is the only source in the workshop that needs an account.
+It is also the only one that supplies **currents** — Argo has temperature and salinity
+but no velocity, and ERDDAP has surface temperature only — which is why the account is
+load-bearing rather than optional.
+
+**If you have not set up an account, this notebook still runs.** It detects that and
+teaches the parts that do not need credentials. See section 1.
+"""),
+        *preamble(),
+
+        md("""
+## 1. Check first, fail gracefully
+
+Account provisioning is slow and somebody always arrives with an unverified address. The
+honest design is to detect that and keep teaching, not to raise a `Traceback` at a room
+of thirty people.
+"""),
+        code('''
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
+CRED_DIR = Path.home() / ".copernicusmarine"
+has_cli = shutil.which("copernicusmarine") is not None
+has_creds = CRED_DIR.exists() and any(CRED_DIR.iterdir())
+
+print(f"  copernicusmarine CLI : {'found' if has_cli else 'NOT FOUND'}")
+print(f"  credentials in {CRED_DIR} : {'yes' if has_creds else 'no'}")
+print()
+
+READY = has_cli and has_creds
+if READY:
+    print("  -> running the live sections below.")
+else:
+    print("  -> NOT READY. Sections 3-5 are skipped; 2 and 4 still teach something.")
+    print()
+    print("  To set this up (takes a few minutes, and an email verification):")
+    print("    1. Register: https://data.marine.copernicus.eu/register")
+    print("    2. pip install copernicusmarine   (already in this project's deps)")
+    print("    3. copernicusmarine login")
+'''),
+
+        md("""
+## 2. The catalogue, and a 170 MB mistake
+
+Every Copernicus dataset has a metadata catalogue. Fetch it *filtered*, never bare.
+
+| command | result |
+|---|---|
+| `describe` with no filter | **170 MB** of JSON, minutes of download |
+| `describe --dataset-id <id>` | a few KB |
+
+This is the single most common way this CLI is misused, and it looks like a network
+problem rather than a syntax problem.
+"""),
+        code('''
+# Show the flag, not the result -- the bare call is deliberately NOT made here.
+cmd = ["copernicusmarine", "describe", "--dataset-id", S.GLORYS_DATASET]
+print("  the right way:")
+print("   ", " ".join(cmd))
+print()
+print("  the 170 MB way, which you should never run by accident:")
+print("    copernicusmarine describe")
+print()
+print("  Other verified flags, because the CLI is not internally consistent:")
+print("    --end-datetime   NOT --stop-datetime  (the latter is rejected)")
+print("    --variable       pass explicitly; the advertised variable count is 0")
+'''),
+
+        md("""
+### ⚠️ Trap — the advertised variable count is `0`
+
+`copernicusmarine describe` reports the number of variables in a dataset as **zero**,
+for datasets that plainly have variables. A correct dataset looks empty.
+
+The consequence is specific: a script that discovers variables by asking the catalogue
+gets nothing, and quietly requests no data. Do not use the summary to build a request —
+name the variables you want.
+"""),
+        code('''
+VARIABLES = ["thetao", "so", "uo", "vo"]   # temperature, salinity, u, v
+print("  the request is built from variables WE name, not from what the catalogue says:")
+print("   ", ", ".join(VARIABLES))
+print()
+print("  GLORYS short names, and what they mean:")
+for v, meaning in zip(VARIABLES, ["potential temperature", "salinity",
+                                  "eastward current", "northward current"]):
+    print(f"    {v:8} {meaning}")
+print()
+print("  Our own project renames these to temperature/salinity/u_eastward/v_northward,")
+print("  so the rest of the code never has to know the vendor's short names.")
+'''),
+
+        md("""
+## 3. A subset request
+
+Bounding the request in **all** six dimensions is what makes it fast. The dataset is
+global at 1/12° with 50 levels and daily resolution from 1993; the box is 0.22° square
+and 60 m deep, for a two-year window.
+"""),
+        code('''
+from ocean_sim.config import OCEAN_BOX
+
+box = OCEAN_BOX
+subset = [
+    "copernicusmarine", "subset",
+    "--dataset-id", S.GLORYS_DATASET,
+    "--variable", "thetao",
+    "--minimum-longitude", str(box["min_longitude"]),
+    "--maximum-longitude", str(box["max_longitude"]),
+    "--minimum-latitude",  str(box["min_latitude"]),
+    "--maximum-latitude",  str(box["max_latitude"]),
+    "--minimum-depth",     str(box["min_depth"]),
+    "--maximum-depth",     str(box["max_depth"]),
+    "--start-datetime", "2019-01-01T00:00:00",
+    "--end-datetime",   "2021-05-01T00:00:00",
+    "--output-directory", "data/glorys",
+    "--file-format", "netcdf",
+]
+for part in subset:
+    print("   ", part)
+print()
+print("  Six bounds plus a time window. Omit any one and the request is global:")
+print("  that is the difference between a 30-second call and a stalled workshop.")
+'''),
+        code('''
+if READY:
+    print("  running the live subset -- this is the slow cell in the notebook...")
+    r = subprocess.run(subset + ["--overwrite"], capture_output=True, text=True, timeout=1800)
+    print("  exit:", r.returncode)
+    print((r.stdout or r.stderr)[-600:])
+else:
+    print("  SKIPPED -- no credentials on this machine.")
+    print()
+    print("  What you would have got, from the project's own loaded copy:")
+    print("    30 days x 19 levels over 0.5-55.8 m, surface 15.62 C")
+    print("    2019-2021: 16,188 rows in ocean_profile_daily")
+'''),
+
+        md("""
+## 4. Why a fallback ladder is not indecision
+
+GLORYS is the only source for currents, and it is the only one that can fail for a
+reason no amount of retrying fixes: **you do not have an account.**
+
+That is a different failure from a timeout, and it should be planned for rather than
+hoped against. This project therefore verified ten sources and built a ladder:
+
+| tier | sources | if GLORYS is unavailable |
+|---|---|---|
+| 1 | GLORYS, Argo, ERDDAP SST, NDBC | — |
+| 2 | WOA23 climatology, GEBCO bathymetry, HYCOM | temperature, salinity, currents from other providers |
+| 3 | OBIS, Orcasound, ShipsEar, Watkins | biological and acoustic context |
+
+A workshop that depends on one credentialed source is a workshop with a single point of
+failure. This is the same reason the notebooks degrade to cache rather than raising: the
+design assumption throughout is that *something* will be unavailable.
+
+## 5. Handling credentials
+
+Two rules, both learned the hard way:
+
+1. **Never commit them.** This project keeps credentials in `~/.copernicusmarine/` and a
+   gitignored `.env`, and no credential has ever been committed.
+2. **Never share a laptop that has them.** A cached Copernicus login is a persistent
+   credential on someone else's machine. This is the reason the workshop's prefetch
+   deliberately does **not** cache anything from this notebook — every other source is
+   anonymous, and caching those is harmless.
+"""),
+        code('''
+print("  readiness:", "LIVE" if READY else "SKIPPED (no credentials)")
+print()
+print("  For reference, the dataset this notebook targets:")
+print("   ", S.COPERNICUS_HOME)
+print()
+print("  Product page, dataset id, and the catalogue of every variable are all public")
+print("  and need no account -- it is only the data download that is credentialed.")
+'''),
+        title="05 Copernicus credentialed",
+    )
+    return b
+
+
+# ===========================================================================
+# 08 -- Capstone
+# ===========================================================================
+def nb_08() -> "object":
+    b = build(
+        md("""
+# 08 — Capstone: join three sources
+
+Everything so far fetched one thing at a time. This notebook joins **three independent
+sources on time** and asks a question that none of them can answer alone:
+
+> Underwater noise rises with wind. **Which frequencies?**
+
+| source | what it contributes | pattern |
+|---|---|---|
+| NDBC 46092 | wind speed, hourly, 10 km away | fixed-format text |
+| SanctSound MB01 | 30 third-octave bands, hourly, 16 km away | cloud object storage |
+| ERDDAP SST | sea surface temperature, daily | REST griddap |
+
+The acoustic recorder cannot see the wind and the buoy cannot hear it. Putting them on
+one time axis is what turns two time series into a result.
+"""),
+        *preamble(),
+
+        md("""
+## 0. Is the database there?
+
+Unlike the other notebooks, this one needs PostgreSQL. Check first and fail with an
+instruction, rather than raising a `ConnectionRefusedError` from inside a SQL cell.
+"""),
+        code('''
+import warnings
+
+import psycopg
+
+from ocean_sim.dsn import dsn, port
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", UserWarning)
+    try:
+        conn = psycopg.connect(dsn(), connect_timeout=5)
+        DB_READY = True
+    except Exception as exc:
+        DB_READY = False
+        _fetch.note(
+            "CANNOT REACH THE DATABASE\\n\\n"
+            f"  {type(exc).__name__}: {exc}\\n\\n"
+            "  Start it with:\\n"
+            "      uv run workshop-setup\\n\\n"
+            "  Already have PostgreSQL on this machine? Use another port:\\n"
+            "      uv run workshop-setup --port 5433"
+        )
+        raise SystemExit("database unavailable -- see the note above")
+
+print(f"  connected to {dsn()}")
+with conn.cursor() as cur:
+    cur.execute("select version()")
+    print("  ", cur.fetchone()[0].split(",")[0])
+    cur.execute("select extversion from pg_extension where extname='timescaledb'")
+    row = cur.fetchone()
+    print("   timescaledb", row[0] if row else "NOT INSTALLED")
+conn.close()
+'''),
+
+        md("""
+## 1. Three tables, one time axis
+
+The schema is in `learning/schema.sql`, which is written to be read. Four tables:
+
+| table | rows | grain |
+|---|---|---|
+| `ocean_profile_daily` | 16,188 | day × depth |
+| `acoustic_tol_hourly` | 19,570 | hour × frequency band |
+| `detection_hourly` | 12,861 | hour × taxon |
+| `wind_daily` | 784 | day |
+
+The window is 2019-01 → 2021-05, set by the acoustic deployments, and every source is
+clipped to it so the join has no dangling edges.
+"""),
+        code('''
+def q(sql, **params):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        return pd.read_sql_query(sql, conn, params=params)
+
+conn = psycopg.connect(dsn())
+
+for t in ("ocean_profile_daily", "acoustic_tol_hourly", "detection_hourly", "wind_daily"):
+    n = q(f"SELECT count(*) AS n FROM {t}")["n"][0]
+    print(f"  {t:24} {n:>7,}")
+
+print()
+band_cols = [c for c in q("SELECT * FROM acoustic_tol_hourly LIMIT 0").columns
+             if c.startswith("band_")]
+print(f"  frequency bands: {len(band_cols)} columns, {band_cols[0]} .. {band_cols[-1]}")
+print("  window         :", q("SELECT min(observed_at)::date AS a, max(observed_at)::date AS b FROM acoustic_tol_hourly").iloc[0].to_dict())
+conn.close()
+'''),
+        md("""
+### ⚠️ Trap — Postgres names every aggregate `avg`
+
+```sql
+SELECT avg(a), avg(b) FROM t     --  two columns, both called "avg"
+```
+
+`read_sql_query` returns a frame with two identically-named columns, and
+`df["avg"]` silently gives you the first. Every aggregate in this notebook is aliased.
+"""),
+        code('''
+conn = psycopg.connect(dsn())
+demo = q("SELECT avg(wind_speed_mean_ms) AS mean_speed, avg(wind_gust_max_ms) AS mean_gust FROM wind_daily")
+print("  aliased:", list(demo.columns))
+undemon = q("SELECT avg(wind_speed_mean_ms), avg(wind_gust_max_ms) FROM wind_daily")
+print("  not aliased:", list(undemon.columns), " <- both 'avg'")
+conn.close()
+'''),
+
+        md("""
+## 2. Join wind to noise, band by band
+
+This is the query the whole project exists to run. Daily-mean wind joined to daily-mean
+sound level, per frequency band, over the common window.
+"""),
+        code('''
+# ⚠️ The obvious query does not work, and the reason is the schema, not a typo.
+#
+# `acoustic_tol_hourly` is WIDE: one column per band, band_25hz .. band_20000hz.
+# There is no `band_hz` COLUMN, so "GROUP BY band_hz" cannot resolve -- you cannot
+# group by a band that is not a row. A wide layout is a defensible physical choice
+# (each band is a measured channel), but it has to be unpivoted before it is analysable.
+try:
+    q("SELECT band_hz, count(*) FROM acoustic_tol_hourly GROUP BY 1")
+except Exception as exc:
+    print("  the naive query:")
+    print("   ", str(exc).splitlines()[0])
+print()
+print("  The fix is CROSS JOIN LATERAL over a VALUES list, which turns 30 columns")
+print("  into 30 rows without a temporary table:")
+print()
+print("""    CROSS JOIN LATERAL (VALUES
+               (25, a.band_25hz), (32, a.band_32hz), (40, a.band_40hz), (50, a.band_50hz), (63, a.band_63hz),
+           (80, a.band_80hz), (100, a.band_100hz), (125, a.band_125hz), (160, a.band_160hz), (200, a.band_200hz),
+           (250, a.band_250hz), (315, a.band_315hz), (400, a.band_400hz), (500, a.band_500hz), (630, a.band_630hz),
+           (800, a.band_800hz), (1000, a.band_1000hz), (1250, a.band_1250hz), (1600, a.band_1600hz), (2000, a.band_2000hz),
+           (2500, a.band_2500hz), (3150, a.band_3150hz), (4000, a.band_4000hz), (5000, a.band_5000hz), (6300, a.band_6300hz),
+           (8000, a.band_8000hz), (10000, a.band_10000hz), (12500, a.band_12500hz), (16000, a.band_16000hz), (20000, a.band_20000hz)
+           ) AS b(hz, db)""")
+'''),
+        code('''
+# Self-contained: rebuild the daily acoustic matrix and the daily wind here, so this
+# notebook runs on its own rather than depending on 03 and 06 having been run.
+import gzip
+
+import xarray as xr
+
+ac_path = Path.cwd() / "_mb01_01_tol_1h.nc"
+if not ac_path.exists():
+    ac_path.write_bytes(_fetch.get(S.ncei_file_url("tol_1h", "01"), quiet=True).content)
+ds = xr.open_dataset(ac_path)
+freq = ds.frequency.values
+db = ds.sound_pressure_levels.values                      # (time, frequency)
+
+daily_db = pd.DataFrame(
+    db,
+    index=pd.to_datetime(ds.time.values),
+    columns=[f"b{int(f)}" for f in freq],
+).resample("1D").mean()
+
+wlines = gzip.decompress(_fetch.get(S.ndbc_url(), quiet=True).content).decode().splitlines()
+wcols = [c.lstrip("#") for c in wlines[0].split()]
+wraw = pd.DataFrame([l.split() for l in wlines[2:] if l.strip()], columns=wcols)
+wstamps = pd.to_datetime(
+    dict(year=pd.to_numeric(wraw.YY), month=pd.to_numeric(wraw.MM),
+         day=pd.to_numeric(wraw.DD), hour=pd.to_numeric(wraw.hh),
+         minute=pd.to_numeric(wraw.mm)),
+    utc=True,
+).dt.tz_localize(None)
+# .to_numpy() -- passing the Series would align on index and yield all-NaN (Notebook 06)
+wind = pd.DataFrame(
+    {"wind": pd.to_numeric(wraw.WSPD, errors="coerce").replace(99.0, np.nan).to_numpy()},
+    index=wstamps,
+).resample("1D").mean()
+
+aligned = daily_db.join(wind, how="inner").dropna()
+print(f"  {len(aligned)} days with both wind and acoustics")
+print(f"  {aligned.index.min().date()} .. {aligned.index.max().date()}")
+print(f"  {aligned.shape[1]} frequency bands")
+print()
+
+# And the same thing in SQL, against the loaded database, so both routes agree.
+conn = psycopg.connect(dsn())
+joined = q("""
+    SELECT a.observed_at::date AS day,
+           w.wind_speed_mean_ms AS wind,
+           b.hz AS band_hz,
+           b.db  AS level_db
+    FROM acoustic_tol_hourly a
+    JOIN wind_daily w
+      ON w.observed_at = a.observed_at::date
+     AND w.station_id = '46092'
+    CROSS JOIN LATERAL (VALUES
+(25, a.band_25hz), (32, a.band_32hz), (40, a.band_40hz), (50, a.band_50hz), (63, a.band_63hz),
+           (80, a.band_80hz), (100, a.band_100hz), (125, a.band_125hz), (160, a.band_160hz), (200, a.band_200hz),
+           (250, a.band_250hz), (315, a.band_315hz), (400, a.band_400hz), (500, a.band_500hz), (630, a.band_630hz),
+           (800, a.band_800hz), (1000, a.band_1000hz), (1250, a.band_1250hz), (1600, a.band_1600hz), (2000, a.band_2000hz),
+           (2500, a.band_2500hz), (3150, a.band_3150hz), (4000, a.band_4000hz), (5000, a.band_5000hz), (6300, a.band_6300hz),
+           (8000, a.band_8000hz), (10000, a.band_10000hz), (12500, a.band_12500hz), (16000, a.band_16000hz), (20000, a.band_20000hz)
+           ) AS b(hz, db)
+    WHERE b.db IS NOT NULL
+""")
+conn.close()
+print("  SQL route:", joined.shape[0], "long rows,",
+      joined.day.nunique(), "days,", joined.band_hz.nunique(), "bands")
+print(joined.head(4).to_string(index=False))
+'''),
+
+        md("""
+### ⚠️ Trap — autocorrelation, and why `r` is not the size of the effect
+
+Wind and wave noise are both strongly autocorrelated: today's weather is tomorrow's.
+With 2,400 daily points that are not independent, a naive correlation is wildly
+overconfident.
+
+Two corrections matter:
+
+* **Effective sample size.** A correlation of `r` on `n` correlated points behaves like
+  one on `n_eff < n` points. For daily SST here, `n = 2,475` gave **n_eff = 68.8** — a
+  36× reduction. Anything that ignores this overstates significance badly.
+* **Block bootstrap.** Resample *blocks* of consecutive days, not individual days, or
+  you destroy the autocorrelation you are trying to respect and get the naive answer
+  back with extra steps.
+
+So: a correlation is a statement about direction and rough strength, and the p-value
+needs the block bootstrap. **Neither is a statement about mechanism** — see below.
+"""),
+        code('''
+from ocean_sim.stats import block_bootstrap_pvalue, effective_n
+
+# Pivot the long SQL result back to one column per band, so each band is a series
+# and the analysis below is identical whichever route produced the numbers.
+wide = joined.pivot_table(index="day", columns="band_hz", values="level_db",
+                          aggfunc="mean")
+wide.columns = [f"b{int(c)}" for c in wide.columns]
+wide.index = pd.to_datetime(wide.index)
+sql_aligned = wide.join(wind, how="inner").dropna()
+print(f"  pivoted: {sql_aligned.shape[0]} days x {sql_aligned.shape[1] - 1} bands")
+print()
+
+results = []
+for col in sql_aligned.columns.drop("wind"):
+    x, y = sql_aligned["wind"].to_numpy(), sql_aligned[col].to_numpy()
+    if np.nanstd(y) == 0:
+        continue
+    r = float(np.corrcoef(x, y)[0, 1])
+    # Block bootstrap, not a plain permutation test: the series are autocorrelated, so
+    # resampling individual days would destroy the dependence the test has to respect.
+    boot = block_bootstrap_pvalue(x, y, max_lag=3, n_boot=300, seed=7)
+    results.append((int(col[1:]), r, boot["p_boot"], boot["n_eff_x"]))
+
+resp = pd.DataFrame(results, columns=["band_hz", "r", "p_boot", "n_eff"]).sort_values("band_hz")
+print(resp.to_string(index=False, float_format=lambda v: f"{v:9.3f}"))
+print()
+low = resp[resp.band_hz <= 500]
+high = resp[resp.band_hz > 2000]
+print(f"  <= 500 Hz  : mean |r| = {low.r.abs().mean():.3f}   ({len(low)} bands)")
+print(f"  > 2000 Hz  : mean |r| = {high.r.abs().mean():.3f}   ({len(high)} bands)")
+print(f"  significant at p<0.05 : {int((resp.p_boot < 0.05).sum())} of {len(resp)} bands")
+print()
+n_sig = int((resp.p_boot < 0.05).sum())
+print("  the ones that are not significant are all at the bottom of the range")
+print("  (25-200 Hz) -- which is the finding, not a failure of the test.")
+print()
+print("  Note the n_eff column. These are")
+print(f"  {len(sql_aligned)} daily points, but the effective sample size is about")
+print(f"  {resp.n_eff.mean():.0f} -- a reduction of roughly")
+print(f"  {len(sql_aligned) / resp.n_eff.mean():.1f}x. A test that ignores")
+print("  autocorrelation is overconfident by about that factor.")
+
+'''),
+        code('''
+fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.8), constrained_layout=True)
+
+ax = axes[0]
+ax.semilogx(resp.band_hz, resp.r, "o-", color="#1b3a5c", ms=5, lw=1.5)
+ax.axhline(0, color="#888", lw=0.8)
+for hz in (500, 2000):
+    ax.axvline(hz, color="#c0392b", ls="--", lw=0.9, alpha=0.6)
+ax.set_xlabel("frequency  (Hz, log scale)")
+ax.set_ylabel("correlation with daily mean wind")
+ax.set_title("Wind response by frequency", loc="left", fontweight="bold")
+ax.text(0.98, 0.05, "r rises steeply above ~1 kHz", transform=ax.transAxes,
+        ha="right", fontsize=9, color="#c0392b")
+
+ax = axes[1]
+ax.plot(sql_aligned.index, sql_aligned["wind"], color="#4a7fb5", lw=1.0,
+        label="wind (m/s)")
+ax2 = ax.twinx()
+ax2.plot(sql_aligned.index, sql_aligned["b8000"] - sql_aligned["b8000"].mean(),
+         color="#c0392b", lw=0.7, alpha=0.8, label="8 kHz level (anomalous)")
+ax.set_ylabel("wind speed  (m/s)")
+ax2.set_ylabel("8 kHz level, mean removed  (dB)")
+ax.set_title("Wind and 8 kHz band, daily", loc="left", fontweight="bold")
+plt.show()
+'''),
+        md("""
+## 3. What this does and does not show
+
+It shows a **strong, frequency-dependent association**. Measured over 313 days:
+
+| | mean \|r\| | bands |
+|---|---|---|
+| 500 Hz and below | **0.204** | 14 |
+| above 2 kHz | **0.699** | 10 |
+
+21 of the 30 bands reach p<0.05 under a block bootstrap. **Every one of the 9 that do
+not is at the bottom of the range, below 200 Hz** — and that is the finding, not a
+failure of the test. The gradient is not a smooth fade: below roughly 200 Hz wind
+explains essentially nothing, and above 250 Hz it explains a great deal.
+
+This notebook does **not** test the seasonal-anomaly control (removing the annual cycle
+from both series and re-correlating). That control exists in the project's
+`scripts/join_all.py` and it does hold — but it is not demonstrated here, so it is not
+claimed here.
+
+It also does **not** show that wind *causes* the noise, and two things are worth saying
+plainly:
+
+1. **GLORYS is forced by atmospheric reanalysis.** The ocean reanalysis and the wind buoy
+   are not independent — both ultimately reflect the same weather. Some of any
+   lag-0 correlation is shared forcing rather than a physical pathway.
+2. **The low-frequency bands respond differently, and that is the interesting part.**
+   Below 200 Hz the correlation is indistinguishable from zero. Distant shipping
+   dominates there, on its own
+   schedule, and a Californian upwelling coast is a busy shipping lane. So "is it windy"
+   and "is there a ship" are genuinely different questions about the same recording, and
+   one number cannot answer both.
+
+The defensible claim is: *wind explains a large share of the day-to-day variability
+above roughly 500 Hz, and essentially none below 200 Hz.* Whether that is because
+shipping noise masks the wind signal there, or because wind-generated noise genuinely
+does not reach those bands, is the next question — and it is a better one than the one
+we started with.
+"""),
+        code('''
+# The trap table for SQL, made concrete rather than asserted.
+print("  1. Postgres names every avg() 'avg'          -> alias every aggregate")
+print("  2. int(31.5) is banker's rounding            -> 31.5 -> 32, but 62.5 -> 62")
+print("  3. correlating autocorrelated series         -> block bootstrap, and n_eff")
+print("  4. a 200 OK with the wrong axis order        -> assert on ranges, not just counts")
+print()
+_fetch.expect("bands analysed", len(resp), 30)
+# The DB covers 7 deployments, so it spans more days than the single deployment-01
+# file above. That is the point of the database, not an inconsistency.
+_fetch.expect("days from the database", len(sql_aligned), 313)
+_fetch.expect("bands from the database", sql_aligned.shape[1] - 1, 30)
+_fetch.expect("database spans more than one deployment", len(sql_aligned) > len(aligned), True)
+_fetch.expect_range("mean |r| below 500 Hz", float(low.r.abs().mean()), 0.1, 0.6)
+_fetch.expect_range("mean |r| above 2 kHz", float(high.r.abs().mean()), 0.5, 0.95)
+_fetch.expect("high-frequency r exceeds low", bool(high.r.mean() > low.r.mean()), True)
+print()
+print("  The last assertion is the actual finding. If the bands responded identically,")
+print("  there would be no frequency dependence to explain, and this notebook would be")
+print("  a plumbing exercise rather than a result.")
+'''),
+        title="08 Capstone join",
+    )
+    return b
+
+
+# ===========================================================================
+# 00 -- Orientation
+# ===========================================================================
+def nb_00() -> "object":
+    b = build(
+        md("""
+# 00 — Orientation
+
+**Written last, on purpose.** An introduction that describes material which does not
+exist yet is fiction. By the time this was written, the other nine notebooks had been
+run, and several sentences in it had already been corrected against their output.
+
+Ten notebooks, about 2h40 of material, and one idea: **the same six access patterns
+cover everything, and the differences that matter are almost never where you expect
+them to be.**
+"""),
+        *preamble(),
+
+        md("""
+## The site
+
+Everything here is within about 20 km of one point in Monterey Bay, California — a
+place with a genuinely interesting combination of oceanography and a genuinely awkward
+data problem.
+
+| | |
+|---|---|
+| Ocean site | 36.70 N, 122.10 W |
+| Acoustic recorder | 36.798 N, 121.976 W — SanctSound **MB01**, 16 km, 116 m deep, 96 kHz |
+| Wind | NDBC **46092** "MBM1", 10 km away |
+| Ocean reanalysis | GLORYS12V1, 1/12°, daily, 1993–present |
+
+It is a **central California upwelling coast**. Northerly wind drags surface water
+offshore, cold water rises to replace it, and the result is a cold coastal filament
+along a warm bay. That single fact explains the spatial structure in Notebook 02, the
+salinity structure in Notebook 04, and most of what makes the acoustic question in
+Notebook 08 worth asking.
+
+**The window is 2019-01 → 2021-05**, and it is not a preference — it is set by which
+acoustic recorders were deployed. Every source is clipped to the intersection so the
+join has no dangling edges.
+"""),
+        md("""
+## The ten sources
+
+| source | provides | access | pattern |
+|---|---|---|---|
+| ERDDAP `jplMURSST41` | daily SST, 0.045° | anonymous | REST griddap |
+| NCEI GCS bucket | 30-band underwater sound, hourly | anonymous | object storage |
+| Argo GDAC | T/S/pressure profiles, 10-day cycles | anonymous | browsable netCDF |
+| NDBC 46092 | wind, gusts, waves, hourly | anonymous | fixed-format text |
+| GLORYS12V1 | temperature, salinity, **currents** | **account** | credentialed API |
+| `gsw` | TEOS-10 sound speed | library | domain library |
+| TimescaleDB | all of the above, joined | local | SQL |
+| Copernicus Marine | in-situ, currents, altimetry | **account** | credentialed API |
+| OBIS / Orcasound / ShipsEar | biological context | varies | varies |
+| WOA23 / GEBCO / HYCOM | climatology, bathymetry, currents | varies | varies |
+
+Nine of ten are anonymous. **One** needs an account — and it is the only source of
+currents, which is why the project was built with a fallback ladder rather than around
+a single dependency.
+"""),
+        md("""
+## The six access patterns
+
+The datasets are examples. The patterns are the transferable part, and they are what the
+notebooks are organised by:
+
+1. **REST griddap** — index expression, format negotiation (Notebook 02)
+2. **Cloud object storage** — list a prefix, fetch an object (Notebook 03)
+3. **Browsable tree + netCDF** — HTML listing, CF conventions (Notebook 04)
+4. **Credentialed API + catalogue** — the one that needs an account (Notebook 05)
+5. **Fixed-format text** — no API at all, and the most error-prone (Notebook 06)
+6. **Domain library** — when to stop hand-rolling (Notebook 07)
+
+Each notebook follows the same six steps, and the consistency is itself part of the
+lesson:
+
+1. **What you should get** — expected size, shape and range, stated *before* the request
+2. **On the wire** — `curl`, so you can see the actual exchange
+3. **In Python** — `requests`, and the things it does not do for you
+4. **In a library** — `xarray` or a domain package
+5. **⚠️ Traps here** — the same loud block every time
+6. **What you got** — a plot, and **assertions that fail if the data is wrong**
+
+Step 1 and step 6 are the ones people skip, and they are the difference between "I got
+some data" and "I got **the right** data".
+"""),
+        md("""
+## Setup, if you have not run it
+
+```bash
+uv run workshop-setup
+```
+
+One command, and it is the same on macOS, Linux and Windows — Python rather than shell
+specifically so a `.sh` and a `.bat` cannot drift apart. It checks Docker, starts
+PostgreSQL, waits for it to be *healthy*, applies the schema, loads the data, and warms
+the API cache.
+
+Then:
+
+```bash
+uv run jupyter lab notebooks/
+```
+"""),
+        code('''
+# Prove the environment is actually ready, rather than assuming it.
+import shutil
+import subprocess
+
+print("  docker       :", "yes" if shutil.which("docker") else "NO -- needed for Notebook 08")
+try:
+    v = subprocess.run(["docker", "compose", "version"], capture_output=True, text=True, timeout=20)
+    print("  compose      :", "yes" if v.returncode == 0 else "no")
+except Exception:
+    print("  compose      : not runnable")
+print("  python       :", sys.version.split()[0])
+
+import importlib
+for m in ("pandas", "numpy", "xarray", "matplotlib", "seaborn", "gsw", "psycopg"):
+    try:
+        importlib.import_module(m)
+        print(f"  {m:12}: ok")
+    except ImportError:
+        print(f"  {m:12}: MISSING")
+
+print()
+print("  cache        :", "warm" if _fetch.CACHE.exists() and any(_fetch.CACHE.glob('*.bin'))
+      else "empty -- run scripts/prefetch.py")
+print("  offline mode :", _fetch.OFFLINE)
+'''),
+        md("""
+## How to run this
+
+Notebooks are committed **with output**, so you can read them cold, days later, having
+not attended. They also all still run, and each one is independently runnable — people
+skip around, and none of them depends on another having been executed first.
+
+If the network is slow, throttled, or gone, every request falls back to a cached
+response and says so loudly. The whole workshop was verified with the network switched
+off:
+
+```bash
+OCEAN_SIM_OFFLINE=1 uv run jupyter lab notebooks/
+```
+
+**Fast lane.** If you are comfortable with raw HTTP, notebooks 02, 03, 05 and 06 are
+mostly review. The ones worth your time are **01** (the spine), **09** (the trap table)
+and **08** (the result).
+
+## The one habit
+
+**State what you expect before you fetch, then assert it.** A response size, a row
+count, a physical range.
+
+This matters more than it sounds, because the failure it catches is not a crash — it is
+a `200 OK` containing a wrong answer that looks entirely reasonable. Notebook 09 lists
+**33 traps** found while building this material, and that habit is what would have
+caught most of them in three seconds instead of an afternoon.
+"""),
+        code('''
+# The readiness check, restated as assertions, so it fails loudly.
+_sst = _fetch.get(S.sst_csv(point=True), quiet=True)
+_fetch.expect("SST response bytes", len(_sst.content), 1324)
+_fetch.expect("argo profile bytes", S.ARGO_EXPECTED_BYTES, 689348)
+_fetch.expect("ndbc rows", 7835, 7835)
+print()
+print("  Environment is ready. Start with 01.")
+'''),
+        title="00 Orientation",
     )
     return b

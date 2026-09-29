@@ -24,6 +24,9 @@ __pycache__/
 .ipynb_checkpoints/
 # prefetched API responses -- real data, but regenerable, and large
 notebooks/.cache/
+# scratch files the notebooks write into the working directory
+notebooks/_*.nc
+notebooks/_traps.csv
 
 # macOS
 .DS_Store

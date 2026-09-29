@@ -240,8 +240,15 @@ def manifest() -> list[tuple[str, str, dict | None]]:
         ("erddap/sst-box-csv", sst_csv(), None),
         ("erddap/sst-point-csv", sst_csv(point=True), None),
         ("erddap/sst-nc", sst_nc(), None),
+        # The .das metadata is how you learn the server's axis order, which Notebook 02
+        # needs before it can trust any spatial result. Not optional.
+        ("erddap/sst-das", f"{ERDDAP}.das", None),
         ("gcs/list-sites", GCS_API,
          gcs_list_params(f"sanctsound/products/sound_level_metrics/{NCEI_SITE}/", "/", 200)),
+        # The same prefix with delimiter="" -- a different cache key, because the cache
+        # key hashes url + sorted params. Notebook 03 shows both.
+        ("gcs/list-sites-nodelim", GCS_API,
+         gcs_list_params(f"sanctsound/products/sound_level_metrics/{NCEI_SITE}/", "", 200)),
     ]
     for dep in ("01", "09"):
         items.append((
