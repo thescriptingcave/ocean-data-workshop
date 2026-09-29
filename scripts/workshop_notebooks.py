@@ -44,6 +44,11 @@ import seaborn as sns
 import _fetch
 import _sources as S
 
+# A real requests.Session, with a disk cache. Everything you use below -- .get,
+# .text, .content, .json, .status_code, .raise_for_status, params= -- is
+# ordinary `requests`. The cache is invisible at the call site.
+http = _fetch.session()
+
 sns.set_theme(style="whitegrid", context="notebook")
 plt.rcParams["figure.dpi"] = 110
 
@@ -184,7 +189,7 @@ if shutil.which("curl"):
 else:
     print("curl not found (it ships with macOS, Linux and Windows 10+).")
     print("Python equivalent:")
-    print(_fetch.get(URL).text[:400])
+    print(http.get(URL).text[:400])
 '''),
 
         md("""
@@ -200,7 +205,7 @@ error, no warning, just a frame where one temperature is the string `degree_C`.
 """),
         code('''
 url = S.sst_csv(point=True)
-raw = _fetch.get(url)
+raw = http.get(url)
 print(raw.text)
 '''),
 
@@ -294,8 +299,8 @@ strides and no constraint variables.
 is the one line that does it.
 """),
         code('''
-box = _fetch.get(S.sst_csv(), quiet=True)
-point = _fetch.get(S.sst_csv(point=True), quiet=True)
+box = http.get(S.sst_csv())
+point = http.get(S.sst_csv(point=True))
 print(f"  full box : {len(box.content):>9,} B   {len(box.text.splitlines()) - 2:>6,} rows")
 print(f"  one point: {len(point.content):>9,} B   {len(point.text.splitlines()) - 2:>6,} rows")
 print(f"  ratio    : {len(box.content) / len(point.content):,.0f}x smaller")
@@ -367,9 +372,11 @@ This is what you should reach for **after** you know what the wire format looks 
 A library hides structure you need to know about in order to debug it.
 """),
         code('''
+import io
+
 import xarray as xr
 
-nc = _fetch.get(S.sst_nc(), quiet=True)
+nc = http.get(S.sst_nc())
 path = Path.cwd() / "_sst_sep2019.nc"
 path.write_bytes(nc.content)
 
@@ -378,6 +385,140 @@ print(ds)
 print()
 print("the variable we asked for:", list(ds.data_vars))
 print("its units attribute      :", ds[S.SST_VAR].attrs.get("units"))
+'''),
+
+        md("""
+## 4b. Getting a response *into* a DataFrame
+
+Everything so far has produced a `requests.Response`. A response is not a DataFrame, and
+this step is where most of the real mistakes happen -- not in the request.
+
+Four attributes carry the payload, and which one you need is decided by the format:
+
+| attribute | what it is | use it for |
+|---|---|---|
+| `r.text` | body decoded to `str` | JSON, CSV, HTML -- anything human-readable |
+| `r.content` | body as `bytes`, untouched | binary: netCDF, gzip, images |
+| `r.json()` | body parsed as JSON | any JSON API |
+| `r.headers` / `r.status_code` | metadata | checks before you trust the body |
+
+`pandas` reads a **file-like object**, not a string and not a response. So you need one
+thin adapter, and which one depends on whether you have text or bytes.
+"""),
+        code('''
+# 1. JSON -> DataFrame. The easy case: r.json() gives you ordinary Python objects.
+gcs = http.get(S.GCS_API, params=S.gcs_list_params(
+    f"sanctsound/products/sound_level_metrics/{S.NCEI_SITE}/", "/", 200))
+body = gcs.json()
+print("  top-level keys:", list(body))
+print()
+print("  Note which keys are actually present. We asked for delimiter='/', so the")
+print("  server rolled the listing up into 'prefixes' and returned no 'items' at all:")
+print("    prefixes:", len(body.get("prefixes", [])), " items:", len(body.get("items", [])))
+print()
+print("  An object listing is not a table, so you build one. Either list:")
+rows = pd.DataFrame([{"prefix": p} for p in body.get("prefixes", [])])
+print("   from prefixes ->", rows.shape)
+print()
+print("  ...or drop the delimiter and get flat objects with full metadata:")
+flat = http.get(S.GCS_API, params=S.gcs_list_params(
+    f"sanctsound/products/sound_level_metrics/{S.NCEI_SITE}/", "", 200)).json()
+items = pd.DataFrame(flat["items"])
+print("   from items    ->", items.shape)
+print("   columns       :", list(items.columns))
+print("   first name    :", items["name"].iloc[0])
+print()
+print("  pd.DataFrame(...) works on a dict of equal-length lists; pd.json_normalize")
+print("  flattens one level for nested JSON. Which one you want depends on the")
+print("  response you actually got -- so look at the keys before building.")
+'''),
+        code('''
+# 2. Text -> DataFrame. pandas needs a file-like object, so wrap the string.
+df = pd.read_csv(io.StringIO(http.get(URL).text), skiprows=[1])
+print("  from r.text    ->", df.shape, list(df.columns))
+
+# 3. Bytes -> DataFrame. BytesIO, not StringIO.
+csv_bytes = http.get(S.sst_csv()).content
+df2 = pd.read_csv(io.BytesIO(csv_bytes), skiprows=[1])
+print("  from r.content ->", df2.shape, "   identical:", df.equals(df2))
+'''),
+        code('''
+# 4. Binary -> xarray. Some formats have no text form at all, so this is the only route.
+nc_bytes = http.get(S.sst_nc()).content
+path = Path.cwd() / "_from_bytes.nc"
+path.write_bytes(nc_bytes)
+ds = xr.open_dataset(path)
+print("  netCDF via r.content ->", dict(ds.sizes))
+
+ds2 = xr.open_dataset(io.BytesIO(nc_bytes))
+print("  BytesIO works too    ->", dict(ds2.sizes))
+'''),
+        code('''
+# 5. Gzipped text is the trap in this section. NDBC serves .txt.gz.
+gz = http.get(S.ndbc_url())
+print("  r.content type :", type(gz.content).__name__, f"{len(gz.content):,}", "bytes")
+print("  r.text   type  :", type(gz.text).__name__, f"{len(gz.text):,}", "chars")
+print()
+print("  r.text DECODES the gzip bytes as though they were plain text. It does not")
+print("  decompress them. You get mojibake, and pd.read_csv on it gives nonsense")
+print("  with no error at all. For .gz you must use r.content plus gzip:")
+import gzip
+
+text = gzip.decompress(gz.content).decode()
+lines = text.splitlines()
+print()
+print("  after gzip.decompress:", len(lines), "lines")
+print("  header:", lines[0][:62])
+'''),
+        md("""
+### The rule, in one line
+
+**`r.text` for anything the server calls text. `r.content` for everything else, and
+check `Content-Type` when you are unsure.**
+
+```python
+r = http.get(url)
+
+r.raise_for_status()            # before you trust any of it
+ctype = r.headers.get("Content-Type", "")
+if "json" in ctype:
+    df = pd.json_normalize(r.json())
+elif "csv" in ctype:
+    df = pd.read_csv(io.StringIO(r.text))
+else:
+    Path("payload.bin").write_bytes(r.content)   # netCDF, gzip, ...
+```
+
+Always `r.raise_for_status()` first. A 500 whose body is an error message is not JSON,
+and calling `r.json()` on it raises a `JSONDecodeError` that tells you nothing -- you
+have to check the status to read the message the server actually sent.
+
+### And there is no magic in the session
+
+`_fetch.session()` returns an ordinary `requests.Session`. It overrides exactly one
+method, `send`, and that single override *is* the cache. The same code works without it:
+
+```python
+import requests
+r = requests.get(url, timeout=(10, 120))     # that is the whole thing
+```
+
+The session adds two things and no more: it forces IPv4 (trap 6 above), and it falls
+back to a cached response when the network fails. Everything else in this notebook --
+`.get`, `params=`, `.text`, `.content`, `.json()`, `.status_code`, `.raise_for_status()`,
+`.headers` -- is plain `requests`, and identical in your own project.
+"""),
+        code('''
+# Proof: it really is a requests.Session with one method overridden.
+import requests
+
+overridden = [m for m in ("get", "post", "send", "request") if m in vars(type(http))]
+print("  type(http)          :", type(http).__name__)
+print("  is a Session        :", isinstance(http, requests.Session))
+print("  methods overridden  :", overridden)
+print("  requests.get exists :", callable(requests.get))
+print()
+print("  One method, 'send'. Everything else is stock requests.")
 '''),
 
         md("""
@@ -489,7 +630,7 @@ You have to ask.
 """),
         code('''
 # The server tells you its own shape. Always ask before you index.
-info = _fetch.get(f"{S.ERDDAP}.das", quiet=True).text
+info = http.get(f"{S.ERDDAP}.das").text
 for line in info.splitlines():
     if any(k in line for k in ("dimensions:", "time {", "latitude {", "longitude {")):
         print("   ", line.strip())
@@ -539,7 +680,7 @@ you got back is the one you asked for.
 """),
         code('''
 # Prove the ordering matters by checking what comes back, not by trusting the URL.
-txt = _fetch.get(S.sst_csv(), quiet=True).text
+txt = http.get(S.sst_csv()).text
 import io
 d = pd.read_csv(io.StringIO(txt), skiprows=[1])
 print("  latitude  range returned:", d.latitude.min(), "..", d.latitude.max())
@@ -570,12 +711,12 @@ exploration, ask for `.nc` first.
         code('''
 import xarray as xr
 
-nc = _fetch.get(S.sst_nc(), quiet=True)
+nc = http.get(S.sst_nc())
 p = Path.cwd() / "_sst_month.nc"
 p.write_bytes(nc.content)
 ds = xr.open_dataset(p)
 
-print("  csv:", f"{len(_fetch.get(S.sst_csv(), quiet=True).content):,} bytes")
+print("  csv:", f"{len(http.get(S.sst_csv()).content):,} bytes")
 print("  nc :", f"{len(nc.content):,} bytes")
 print()
 print("  and the netCDF answers questions the CSV cannot:")
@@ -799,8 +940,8 @@ url = S.ncei_file_url("tol_1h", "01")
 print("  key :", S.ncei_object_name("tol_1h", "01"))
 print("  url :", url)
 print()
-res = _fetch.get(url)
-print(" ", res.describe())
+res = http.get(url)
+print(" ", _fetch.describe(res))
 '''),
 
         md("""
@@ -831,7 +972,7 @@ if _fetch.OFFLINE:
     print("   <Error><Code>NoSuchKey</Code><Message>The specified key does not exist.")
 else:
     try:
-        _fetch.get(wrong, refresh=True)
+        http.get(wrong, refresh=True)
     except RuntimeError as exc:
         for line in str(exc).splitlines()[:4]:
             print("   ", line)
@@ -901,7 +1042,7 @@ Deployment 01: 3,185 hours × 30 third-octave bands, from 25 Hz to 20 kHz.
 import xarray as xr
 
 p = Path.cwd() / "_mb01_01_tol_1h.nc"
-p.write_bytes(_fetch.get(S.ncei_file_url("tol_1h", "01"), quiet=True).content)
+p.write_bytes(http.get(S.ncei_file_url("tol_1h", "01")).content)
 ds = xr.open_dataset(p)
 
 print("  dims       :", dict(ds.sizes))
@@ -995,7 +1136,7 @@ overkill for a list of `href`s, so a regex is both sufficient and easier to read
         code('''
 import re
 
-listing = _fetch.get(S.ARGO_DIR, quiet=True).text
+listing = http.get(S.ARGO_DIR).text
 links = re.findall(r'href="([^"?/][^"]*)"', listing)
 files = [l for l in links if l.endswith((".nc", ".txt"))]
 
@@ -1018,7 +1159,7 @@ The aggregated `_prof.nc` is the right granularity. The alternative — one file
 import xarray as xr
 
 p = Path.cwd() / "_argo_1900063_prof.nc"
-p.write_bytes(_fetch.get(S.ARGO_FILES["prof"], quiet=True).content)
+p.write_bytes(http.get(S.ARGO_FILES["prof"]).content)
 ds = xr.open_dataset(p)
 
 print("  dims:", dict(ds.sizes))
@@ -1301,7 +1442,7 @@ https://www.ndbc.noaa.gov/data/historical/stdmet/46092h2019.txt.gz
         code('''
 import gzip
 
-res = _fetch.get(S.ndbc_url(), quiet=True)
+res = http.get(S.ndbc_url())
 text = gzip.decompress(res.content).decode()
 lines = text.splitlines()
 
@@ -1573,7 +1714,7 @@ import xarray as xr
 # own. Every notebook in the workshop is independently runnable; people skip around.
 argo_path = Path.cwd() / "_argo_1900063_prof.nc"
 if not argo_path.exists():
-    argo_path.write_bytes(_fetch.get(S.ARGO_FILES["prof"], quiet=True).content)
+    argo_path.write_bytes(http.get(S.ARGO_FILES["prof"]).content)
 ds = xr.open_dataset(argo_path)
 prof = 0
 dbar = ds.PRES.isel(N_PROF=prof).values
@@ -1950,7 +2091,7 @@ day.
 # The habit, in one line.
 def fetch_checked(url, *, expect_bytes=None, expect_rows=None, params=None):
     """Fetch, then immediately prove the response is what you said it would be."""
-    r = _fetch.get(url, params)
+    r = http.get(url, params)
     if expect_bytes is not None:
         _fetch.expect("bytes", len(r.content), expect_bytes)
     if expect_rows is not None:
@@ -2318,7 +2459,7 @@ import xarray as xr
 
 ac_path = Path.cwd() / "_mb01_01_tol_1h.nc"
 if not ac_path.exists():
-    ac_path.write_bytes(_fetch.get(S.ncei_file_url("tol_1h", "01"), quiet=True).content)
+    ac_path.write_bytes(http.get(S.ncei_file_url("tol_1h", "01")).content)
 ds = xr.open_dataset(ac_path)
 freq = ds.frequency.values
 db = ds.sound_pressure_levels.values                      # (time, frequency)
@@ -2329,7 +2470,7 @@ daily_db = pd.DataFrame(
     columns=[f"b{int(f)}" for f in freq],
 ).resample("1D").mean()
 
-wlines = gzip.decompress(_fetch.get(S.ndbc_url(), quiet=True).content).decode().splitlines()
+wlines = gzip.decompress(http.get(S.ndbc_url()).content).decode().splitlines()
 wcols = [c.lstrip("#") for c in wlines[0].split()]
 wraw = pd.DataFrame([l.split() for l in wlines[2:] if l.strip()], columns=wcols)
 wstamps = pd.to_datetime(
@@ -2658,7 +2799,7 @@ for m in ("pandas", "numpy", "xarray", "matplotlib", "seaborn", "gsw", "psycopg"
         print(f"  {m:12}: MISSING")
 
 print()
-print("  cache        :", "warm" if _fetch.CACHE.exists() and any(_fetch.CACHE.glob('*.bin'))
+print("  cache        :", "warm" if _fetch.CACHE.exists() and any(_fetch.CACHE.glob("*.bin"))
       else "empty -- run scripts/prefetch.py")
 print("  offline mode :", _fetch.OFFLINE)
 '''),
@@ -2703,7 +2844,7 @@ caught most of them in three seconds instead of an afternoon.
 """),
         code('''
 # The readiness check, restated as assertions, so it fails loudly.
-_sst = _fetch.get(S.sst_csv(point=True), quiet=True)
+_sst = http.get(S.sst_csv(point=True))
 _fetch.expect("SST response bytes", len(_sst.content), 1324)
 _fetch.expect("argo profile bytes", S.ARGO_EXPECTED_BYTES, 689348)
 _fetch.expect("ndbc rows", 7835, 7835)

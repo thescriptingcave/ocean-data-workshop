@@ -142,6 +142,14 @@ learning/schema.sql   the schema, written to be read
 probes/               the original source-access audit
 ```
 
+`_fetch.py` returns a **real `requests.Session`**. It overrides exactly one method,
+`send`, and that single override is the whole cache — so the code in the notebooks is
+code you would write in your own project, and nothing needs unlearning afterwards. An
+earlier version wrapped `requests` in a `_fetch.get()` function returning a custom type;
+it made the workshop robust and it made the workshop useless, because nobody learned
+`requests` and the parsing of a response into a DataFrame was hidden in a return type.
+Notebook 01 now has a section on exactly that step.
+
 `_sources.py` exists so the prefetch and the notebooks cannot disagree about a URL. Both
 build every request from the same functions — hand-written URLs in the manifest caused a
 silent cache miss on all four GCS entries, and the notebooks then made live calls in a

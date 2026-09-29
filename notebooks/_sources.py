@@ -22,7 +22,6 @@ datasets do not:
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -30,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from _fetch import erddap, get  # noqa: E402
+from _fetch import erddap, session  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # The site. Everything in the workshop is within ~20 km of this point.
@@ -143,7 +142,8 @@ def gcs_list_params(prefix: str, delimiter: str = "/", max_items: int = 200) -> 
 
 def ncei_list(prefix: str, delimiter: str = "/", max_items: int = 200) -> dict:
     """List a prefix in the bucket. Returns the parsed JSON body."""
-    return json.loads(get(GCS_API, gcs_list_params(prefix, delimiter, max_items)).text)
+    # A real requests call. The cache is invisible at this call site.
+    return session().get(GCS_API, params=gcs_list_params(prefix, delimiter, max_items)).json()
 
 
 def ncei_object_name(product: str = "tol_1h", deployment: str = "09",

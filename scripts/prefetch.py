@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "notebooks"))
 sys.path.insert(0, str(ROOT / "src"))
 
-from _fetch import CACHE, get  # noqa: E402
+from _fetch import CACHE, describe, session  # noqa: E402
 from _sources import manifest  # noqa: E402
 
 ARCHIVE = ROOT / "notebooks" / "cache-archive.tar.gz"
@@ -64,6 +64,7 @@ def main() -> int:
     print("=" * 72)
 
     refresh = "--refresh" in sys.argv
+    http = session()
 
     ok, failed, total_bytes = 0, [], 0
     t0 = time.time()
@@ -73,9 +74,9 @@ def main() -> int:
             # passes a stale entry off as fresh -- correct before a workshop on a
             # machine with a network, but fatal on a machine without one, where every
             # call would raise. The archive below is the offline story instead.
-            r = get(url, params, refresh=refresh, quiet=True)
+            r = http.get(url, params=params)
             total_bytes += len(r.content)
-            print(f"  ok   {label:24} {len(r.content):>10,} B  {r.describe()}")
+            print(f"  ok   {label:24} {len(r.content):>10,} B  {describe(r)}")
             ok += 1
         except Exception as exc:
             print(f"  FAIL {label:24} {type(exc).__name__}: {str(exc)[:70]}")

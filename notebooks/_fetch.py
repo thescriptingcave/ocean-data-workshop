@@ -1,32 +1,32 @@
-"""A fetch that never dies in a room.
+"""A real ``requests.Session`` that caches to disk.
 
-The single most reliable way to end a data workshop is to depend on a live network.
-Not because the APIs are bad -- they are good -- but because *workshop* networks are
-throttled, firewalled, or shared with thirty other laptops doing the same thing at
-once.
+The point of this module is what it *doesn't* do. An earlier version wrapped requests in
+a ``_fetch.get()`` function that returned a custom ``FetchResult``, and every notebook
+called that. It made the workshop robust, and it made the workshop useless: nobody
+learned ``requests``, and the parsing of a response into a DataFrame was buried in a
+return type instead of being taught.
 
-So every request in these notebooks goes through :func:`get`, which:
+So the only thing that changes here is ``Session.send``. Everything else -- ``.text``,
+``.content``, ``.json()``, ``.status_code``, ``.raise_for_status()``, ``params=``,
+``headers=`` -- is genuine ``requests``, and the code in the notebooks is code you would
+write in your own project.
 
-  1. tries the network,
-  2. on success, writes the response to ``notebooks/.cache/`` and returns it,
-  3. on *any* failure -- timeout, DNS, 5xx, rate limit -- falls back to the cached
-     copy and says so, loudly, in a way that is visible in a shared room.
+The cache exists because venue wifi is the one thing you cannot control and the one
+thing that ends a data workshop. It is implemented where a proxy would sit, so it is
+invisible at the call site: a successful request is written to disk, and *any* failure --
+timeout, DNS, 5xx, rate limit -- is served from disk with a loud warning. The worst case
+is a stale-but-real response, not thirty tracebacks.
 
-That means the worst case is a stale-but-real response with a printed warning, rather
-than thirty tracebacks and a dead afternoon.
+It also forces IPv4, because some machines resolve AAAA records but have no IPv6 route,
+where ``requests`` waits out the full connect timeout on the dead address. ``curl`` races
+address families and looks healthy while doing it. Measured 100x. See Notebook 01.
 
-It also forces IPv4. Some machines resolve AAAA records but have no IPv6 route:
-``curl`` races addresses and looks fine, while urllib3 waits out the full connect
-timeout on the dead address before falling back -- measured here at 100x slower, with
-every call taking exactly the timeout value. Notebooks get that fix for free; see
-Notebook 01 for why it exists.
+Usage in every notebook::
 
-Cache layout::
-
-    notebooks/.cache/<sha1>.bin      raw response bytes
-    notebooks/.cache/<sha1>.meta     url, params, timestamp, content-type
-
-Deleting ``notebooks/.cache/`` is always safe; it refills on the next run.
+    http = _fetch.session()          # a real requests.Session
+    r = http.get(url)                # real requests
+    r.raise_for_status()
+    df = pd.read_csv(io.StringIO(r.text), skiprows=[1])
 """
 
 from __future__ import annotations
@@ -37,7 +37,6 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any
 from urllib.parse import urlencode
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -51,45 +50,13 @@ for _p in (ROOT, ROOT / "src"):
 
 from ocean_sim.http import force_ipv4  # noqa: E402
 
-_force_ipv4_applied = force_ipv4()
+_IPV4_APPLIED = force_ipv4()
 
 # Set OCEAN_SIM_OFFLINE=1 to forbid the network entirely. Used to test the fallback
 # path, and useful on a train.
 OFFLINE = os.environ.get("OCEAN_SIM_OFFLINE", "").strip().lower() in ("1", "true", "yes")
 
 _TIMEOUT = (10, 120)  # connect, read
-
-
-class FetchResult:
-    """A response, and an honest account of where it came from."""
-
-    def __init__(self, content: bytes, url: str, *, live: bool, status: int = 200,
-                 content_type: str = "", age_seconds: float | None = None):
-        self.content = content
-        self.url = url
-        self.live = live
-        self.status = status
-        self.content_type = content_type
-        self.age_seconds = age_seconds
-
-    @property
-    def text(self) -> str:
-        return self.content.decode("utf-8", errors="replace")
-
-    def __len__(self) -> int:
-        return len(self.content)
-
-    def save(self, path: str | Path) -> Path:
-        p = Path(path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_bytes(self.content)
-        return p
-
-    def describe(self) -> str:
-        source = "LIVE" if self.live else "CACHED"
-        kb = len(self.content) / 1024
-        age = "" if self.age_seconds is None else f", {self.age_seconds / 3600:.1f} h old"
-        return f"{source}  {kb:,.1f} KB  HTTP {self.status}{age}"
 
 
 def _key(url: str, params: dict | None) -> str:
@@ -101,151 +68,143 @@ def _paths(k: str) -> tuple[Path, Path]:
     return CACHE / f"{k}.bin", CACHE / f"{k}.meta"
 
 
-def get(
-    url: str,
-    params: dict[str, Any] | None = None,
-    *,
-    refresh: bool = False,
-    quiet: bool = False,
-) -> FetchResult:
-    """GET a URL, falling back to the cached response if the network fails.
+def _warn_cached(url: str, reason: str, meta: dict, age: float | None) -> None:
+    when = (time.strftime("%Y-%m-%d %H:%M", time.localtime(meta["ts"]))
+            if meta.get("ts") else "an earlier run")
+    print("  !! NETWORK UNAVAILABLE -- serving the cached response")
+    print(f"  !!   reason : {reason}")
+    print(f"  !!   fetched: {when}")
+    if age is not None:
+        print(f"  !!   age    : {age / 3600:.0f} h")
+    print("  !!   the numbers below are real data, but not necessarily current.")
 
-    ``params`` is part of the cache key, so two different queries never collide.
 
-    ``refresh=True`` refuses to fall back to cache and raises instead. That is for the
-    prefetcher, which must never mistake a stale cache entry for a fresh download. In a
-    notebook you want the fallback; before a workshop you want the truth.
+def session():
+    """Return a caching ``requests.Session``.
+
+    Everything about this object is standard ``requests``. ``send`` is overridden --
+    that is the single seam -- and that is all.
     """
-    CACHE.mkdir(parents=True, exist_ok=True)
-    k = _key(url, params)
-    bin_p, meta_p = _paths(k)
+    import requests
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
 
-    if OFFLINE:
-        reason = "offline mode (OCEAN_SIM_OFFLINE=1)"
-    else:
-        reason = ""
-        try:
-            import requests
+    class CachedSession(requests.Session):
+        """A real requests.Session. Only ``send`` is overridden, to add a disk cache.
 
-            r = requests.get(url, params=params, timeout=_TIMEOUT)
-            r.raise_for_status()
-            bin_p.write_bytes(r.content)
-            meta_p.write_text(
-                json.dumps(
-                    {
-                        "url": url,
-                        "params": params,
-                        "status": r.status_code,
-                        "content_type": r.headers.get("Content-Type", ""),
+        Because ``send`` is the last step before the socket, the caching is invisible at
+        the call site: you write ordinary requests code and get a cache.
+        """
+
+        def send(self, request, **kwargs):
+            kwargs.setdefault("timeout", _TIMEOUT)
+            k = _key(request.url, None)
+            bin_p, meta_p = _paths(k)
+
+            if not OFFLINE:
+                try:
+                    resp = super().send(request, **kwargs)
+                    resp.raise_for_status()
+                    CACHE.mkdir(parents=True, exist_ok=True)
+                    bin_p.write_bytes(resp.content)
+                    meta_p.write_text(json.dumps({
+                        "url": request.url,
+                        "status": resp.status_code,
+                        "content_type": resp.headers.get("Content-Type", ""),
+                        "encoding": resp.encoding,
                         "ts": time.time(),
-                    },
-                    indent=2,
+                    }, indent=2))
+                    return resp
+                except Exception as exc:
+                    reason = f"{type(exc).__name__}: {str(exc).splitlines()[0][:80]}"
+            else:
+                reason = "offline mode (OCEAN_SIM_OFFLINE=1)"
+
+            if not bin_p.exists():
+                raise requests.exceptions.ConnectionError(
+                    f"No cached response and no working network for:\n  {request.url}\n"
+                    f"  failed as: {reason}\n"
+                    f"  On a connected machine run: uv run python scripts/prefetch.py"
                 )
-            )
-            if not quiet:
-                print(f"  {FetchResult(r.content, url, live=True, status=r.status_code).describe()}")
-            return FetchResult(
-                r.content, url, live=True, status=r.status_code,
-                content_type=r.headers.get("Content-Type", ""),
-            )
-        except Exception as exc:
-            reason = f"{type(exc).__name__}: {exc}"
 
-        if refresh:
-            raise RuntimeError(
-                f"refresh=True and the fetch failed:\n  {url}\n  as: {reason}"
-            )
+            meta = json.loads(meta_p.read_text()) if meta_p.exists() else {}
+            ts = float(meta.get("ts", 0.0))
+            _warn_cached(request.url, reason, meta, time.time() - ts if ts else None)
 
-    # --- fall back to cache -------------------------------------------------
-    if not bin_p.exists():
-        raise RuntimeError(
-            f"No cached copy and no working network for:\n  {url}\n"
-            f"  failed as: {reason}\n"
-            f"  Run `uv run python scripts/prefetch.py` on a working network first, "
-            f"or re-run this cell once you have connectivity."
-        )
+            # Rebuild a genuine Response so callers keep the whole requests API.
+            cached = requests.Response()
+            cached.status_code = int(meta.get("status", 200))
+            cached._content = bin_p.read_bytes()
+            cached.headers["Content-Type"] = meta.get("content_type", "")
+            cached.encoding = meta.get("encoding") or "utf-8"
+            cached.url = request.url
+            cached.request = request
+            return cached
 
-    meta = json.loads(meta_p.read_text()) if meta_p.exists() else {}
-    content = bin_p.read_bytes()
-    ts = float(meta.get("ts", 0.0))
-    age = time.time() - ts if ts else None
-    if not quiet:
-        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "an earlier run"
-        print("  !! NETWORK UNAVAILABLE -- using cached response")
-        print(f"  !!   reason : {reason}")
-        print(f"  !!   fetched: {when}")
-        if age is not None:
-            print(f"  !!   age    : {age / 3600:.1f} hours")
-        print("  !!   the numbers below are real data, but not necessarily current.")
-    return FetchResult(
-        content, url, live=False,
-        status=int(meta.get("status", 200)),
-        content_type=str(meta.get("content_type", "")),
-        age_seconds=age,
-    )
+    sess = CachedSession()
+    retry = Retry(total=3, backoff_factor=0.6,
+                  status_forcelist=(429, 500, 502, 503, 504),
+                  allowed_methods=frozenset({"GET", "HEAD"}), raise_on_status=False)
+    sess.mount("https://", HTTPAdapter(max_retries=retry))
+    sess.mount("http://", HTTPAdapter(max_retries=retry))
+    return sess
 
 
-def fetch_bytes(url: str, params: dict | None = None, **kw) -> bytes:
-    """Shorthand when only the payload matters."""
-    return get(url, params, **kw).content
+def describe(r) -> str:
+    """One line about a response, for logging. Handy when sweeping many URLs."""
+    origin = "CACHED" if getattr(r, "_from_cache", False) else "LIVE"
+    return f"{origin}  {len(r.content) / 1024:,.1f} KB  HTTP {r.status_code}"
 
 
 def erddap(base: str, var: str, index: str, *, fmt: str = "csv", server: dict | None = None):
-    """Build an ERDDAP griddap URL. **The brackets must stay in the URL, not in
-    ``params``** -- and that is not a style preference, see below.
+    """Build an ERDDAP griddap URL. **The brackets stay in the URL, not in ``params=``** --
+    and that is not a style preference.
 
     ERDDAP's index expression is part of the *parameter name*, so the wire format is::
 
         jplMURSST41.csv?analysed_sst[(t0):(t1)][(lat0):(lat1)][(lon0):(lon1)]
 
-    There is no ``=`` after the index expression. ``requests``' ``params=`` argument
-    cannot express this, in either direction:
+    with no ``=`` after it. ``requests``' ``params=`` cannot express this, in either
+    direction:
 
       * ``{expr: None}``  -- requests **drops** the parameter entirely, so ERDDAP
-        answers 500 ``destinationVariableName=... wasn't found in datasetID=...``
+        answers 500 ``destinationVariableName=... wasn't found``
       * ``{expr: ""}``    -- requests emits a trailing ``=``, and ERDDAP 500s on it
 
     Both fail with the same opaque 500, so the cause is not obvious from the symptom.
-    Hand-build the query string instead. Verified: 200, 2,647 lines.
+    Hand-build the query string. Verified: 200, 2,647 lines.
 
-    ``server`` may carry ``.time`` / ``.lat`` / ``.lon`` server-side directives, e.g.
-    ``{"time": "first"}``, which return one column per day instead of the full cube --
-    far smaller responses.
+    ``server`` may carry server-side directives such as ``{"time": "first"}``. They need
+    a leading dot or ERDDAP answers 400 -- see Notebook 01 for what they actually do,
+    which is mostly nothing.
     """
     q = f"{base}.{fmt}?{var}{index}"
     for k, v in (server or {}).items():
-        # Server-side directives are ``.time=first``, and the leading dot is required.
-        # Omitting it returns a bare 400 with no explanation. Normalised here so a
-        # notebook cannot get it wrong, and so the mistake stays visible in the code.
-        name = k if k.startswith(".") else f".{k}"
-        q += f"&{name}={v}"
+        q += f"&{k if k.startswith('.') else f'.{k}'}={v}"
     return q
 
 
 def expect(label: str, got, want, tol: float = 0.0) -> None:
-    """Assert a value is what we said it would be, loudly.
+    """Assert a value is what the notebook said it would be, loudly.
 
     Included because the failure mode that costs an afternoon is not a crash -- it is a
-    200 response containing plausible nonsense. Every notebook states an expectation up
-    front and checks it at the end, so a wrong answer is visible in three seconds rather
-    than after someone has built a plot on top of it.
+    200 OK containing plausible nonsense. Every notebook states an expectation up front
+    and checks it at the end, so a wrong answer is visible in three seconds rather than
+    after someone has plotted it.
     """
     ok = abs(float(got) - float(want)) <= tol if tol else got == want
-    mark = "ok " if ok else "!! "
-    print(f"  {mark} {label}: got {got!r}, expected {want!r}")
+    print(f"  {'ok ' if ok else '!! '} {label}: got {got!r}, expected {want!r}")
     if not ok:
         raise AssertionError(
-            f"{label}: got {got!r}, expected {want!r}. "
-            f"The response is not what this notebook says it should be -- stop and "
-            f"read the traps section before continuing."
+            f"{label}: got {got!r}, expected {want!r}. The response is not what this "
+            f"notebook says it should be -- stop and read the traps section first."
         )
 
 
 def expect_range(label: str, got, lo, hi) -> None:
     """Assert a physical value falls in a plausible range."""
     ok = lo <= float(got) <= hi
-    mark = "ok " if ok else "!! "
-    print(f"  {mark} {label}: {got} in [{lo}, {hi}]")
+    print(f"  {'ok ' if ok else '!! '} {label}: {got} in [{lo}, {hi}]")
     if not ok:
         raise AssertionError(
             f"{label}: {got} is outside the physically plausible range [{lo}, {hi}]. "
