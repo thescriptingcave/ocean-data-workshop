@@ -143,7 +143,7 @@ def get(
                 r.content, url, live=True, status=r.status_code,
                 content_type=r.headers.get("Content-Type", ""),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             reason = f"{type(exc).__name__}: {exc}"
     elif OFFLINE:
         reason = "offline mode (OCEAN_SIM_OFFLINE=1)"
@@ -159,13 +159,16 @@ def get(
 
     meta = json.loads(meta_p.read_text()) if meta_p.exists() else {}
     content = bin_p.read_bytes()
-    age = time.time() - meta.get("ts", time.time())
+    ts = float(meta.get("ts", 0.0))
+    age = time.time() - ts if ts else None
     if not quiet:
-        print(f"  !! NETWORK UNAVAILABLE -- using cached response")
-        print(f"  !!   reason: {reason}")
-        print(f"  !!   age   : {age / 3600:.1f} hours")
-        print(f"  !!   this is real data from {meta.get('ts') and time.strftime('%Y-%m-%d %H:%M', time.localtime(meta['ts'])) or 'an earlier run'}")
-        print(f"  !!   the numbers below are correct, but not necessarily current.")
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else "an earlier run"
+        print("  !! NETWORK UNAVAILABLE -- using cached response")
+        print(f"  !!   reason : {reason}")
+        print(f"  !!   fetched: {when}")
+        if age is not None:
+            print(f"  !!   age    : {age / 3600:.1f} hours")
+        print("  !!   the numbers below are real data, but not necessarily current.")
     return FetchResult(
         content, url, live=False,
         status=int(meta.get("status", 200)),

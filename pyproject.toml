@@ -35,6 +35,11 @@ dev = [
 line-length = 90
 target-version = "py312"
 
+[project.scripts]
+# Cross-platform entry points. `uv run workshop-setup` is the same on macOS, Linux and
+# Windows, which is why setup is Python and not a .sh plus a .bat that drift apart.
+workshop-setup = "ocean_sim.workshop_setup:main"
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "RUF"]
 # PERF102/SIM117 are micro-optimisations that make probe code harder to read for no
