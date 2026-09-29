@@ -1,5 +1,4 @@
 import pathlib
-import re
 
 p = pathlib.Path("scripts/workshop_notebooks.py")
 s = p.read_text()

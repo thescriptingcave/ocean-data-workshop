@@ -1537,7 +1537,7 @@ print("  mean is not doing anything. They should differ.")
 # ===========================================================================
 # 07 -- When a library beats a request
 # ===========================================================================
-def nb_07() -> "object":
+def nb_07() -> object:
     b = build(
         md("""
 # 07 — When a library beats a request
@@ -1842,7 +1842,7 @@ TRAPS: list[tuple] = [
 ]
 
 
-def nb_09() -> "object":
+def nb_09() -> object:
     rows_md = "\n".join(
         f"| {i} | {w} | {sym} | {fix} | {v} |"
         for i, (w, breaks, sym, fix, v) in enumerate(TRAPS, 1)
@@ -1969,7 +1969,7 @@ print("  before building anything on top of it.")
 # ===========================================================================
 # 05 -- Credentialed API
 # ===========================================================================
-def nb_05() -> "object":
+def nb_05() -> object:
     b = build(
         md("""
 # 05 — Authenticate, then query
@@ -2164,7 +2164,7 @@ print("  and need no account -- it is only the data download that is credentiale
 # ===========================================================================
 # 08 -- Capstone
 # ===========================================================================
-def nb_08() -> "object":
+def nb_08() -> object:
     b = build(
         md("""
 # 08 — Capstone: join three sources
@@ -2533,7 +2533,7 @@ print("  a plumbing exercise rather than a result.")
 # ===========================================================================
 # 00 -- Orientation
 # ===========================================================================
-def nb_00() -> "object":
+def nb_00() -> object:
     b = build(
         md("""
 # 00 — Orientation
