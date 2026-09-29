@@ -135,7 +135,7 @@ url = (
     "&.time=first&.lat=first&.lon=first"
 )
 
-r = requests.get(url)          # ask for it; this takes a moment
+r = requests.get(url, timeout=30)          # ask for it; this takes a moment
 print(r.status_code)           # 200 means "here it is"
 print(len(r.content), "bytes") # how big it is
 print(r.text[:120])            # the body, as text
@@ -221,7 +221,7 @@ SST_URL = (
     "&.time=first&.lat=first&.lon=first"
 )
 
-r = requests.get(SST_URL)
+r = requests.get(SST_URL, timeout=30)
 r.raise_for_status()          # 4xx/5xx become an exception you can read
 print(r.status_code, len(r.content), "bytes")
 print()
@@ -380,7 +380,7 @@ COOPS_URL = (
     "&time_zone=gmt&units=metric&interval=h&format=json"
 )
 
-r = requests.get(COOPS_URL)
+r = requests.get(COOPS_URL, timeout=30)
 r.raise_for_status()
 print(r.status_code, len(r.content), "bytes")
 print()
@@ -545,7 +545,7 @@ import requests
 
 NDBC_URL = "https://www.ndbc.noaa.gov/data/historical/stdmet/46092h2019.txt.gz"
 
-r = requests.get(NDBC_URL)
+r = requests.get(NDBC_URL, timeout=30)
 r.raise_for_status()
 print(r.status_code, len(r.content), "bytes")
 print("content type:", r.headers.get("Content-Type"))
@@ -737,7 +737,7 @@ if week_url:
 
     import pandas as pd
 
-    r = requests.get(week_url)
+    r = requests.get(week_url, timeout=30)
     r.raise_for_status()
     print(r.text[:200])          # look before you parse
     print()
@@ -760,7 +760,7 @@ point and check the number is plausible for where you asked.
 moved_url = None  # <- replace
 
 if moved_url:
-    r = requests.get(moved_url)
+    r = requests.get(moved_url, timeout=30)
     r.raise_for_status()
     import io
 
@@ -788,7 +788,7 @@ say so in a comment. That lookup is the job.
 new_url = None  # <- replace
 
 if new_url:
-    r = requests.get(new_url)
+    r = requests.get(new_url, timeout=30)
     r.raise_for_status()
     payload = r.json()
     import pandas as pd
@@ -845,6 +845,40 @@ NOTEBOOKS = {
 }
 
 
+def force_ipv4() -> bool:
+    """Restrict getaddrinfo to IPv4, so a dead IPv6 route does not stall every fetch.
+
+    Duplicated from ``src/ocean_data_workshop/http.py`` on purpose. Importing it would
+    tie Workshop Intro to the rest of the repository, and the CI ``workshop intro`` job
+    installs only ``beginners/requirements.txt`` -- so an import here would break the
+    isolation that job exists to enforce.
+
+    Why it is needed: ``coastwatch.pfeg.noaa.gov`` publishes an AAAA record
+    (``2610:20:90a3:3bcc::15``) that some networks cannot route. urllib3 commits to the
+    first address and waits out the full connect timeout before falling back, so every
+    ERDDAP call costs 20s and can still fail outright. The two other sources are on
+    CloudFront and AWS, whose IPv6 works, which is why only ERDDAP broke in CI.
+
+    Applied by the builder, never by the notebooks: the teaching code stays plain
+    ``requests``, because a reader's own network is their own problem to diagnose and
+    nothing here should hint that a workshop is secretly full of workarounds.
+    """
+    import socket
+
+    if getattr(socket.getaddrinfo, "_beginners_ipv4_patched", False):
+        return False
+    orig = socket.getaddrinfo
+
+    def _v4_only(host, port, *args, **kwargs):
+        infos = orig(host, port, *args, **kwargs)
+        v4 = [i for i in infos if i[0] == socket.AF_INET]
+        return v4 or infos  # fall back to whatever we got if there is no A record
+
+    _v4_only._beginners_ipv4_patched = True  # type: ignore[attr-defined]
+    socket.getaddrinfo = _v4_only  # type: ignore[assignment]
+    return True
+
+
 def main() -> int:
     import argparse
 
@@ -872,6 +906,9 @@ def main() -> int:
         return 0
 
     from nbclient import NotebookClient
+
+    if force_ipv4():
+        print("  (forcing IPv4: the ERDDAP host publishes an unroutable AAAA record)")
 
     print()
     failed = []
