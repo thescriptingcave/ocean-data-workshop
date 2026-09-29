@@ -26,7 +26,7 @@ HARNESS = Probe(
 )
 
 DSN = os.environ.get(
-    "OCEAN_SIM_DSN", "postgresql://postgres:ocean@localhost:5432/ocean_sim"
+    "OCEAN_DATA_WORKSHOP_DSN", "postgresql://postgres:ocean@localhost:5432/ocean_data_workshop"
 )
 
 
@@ -114,7 +114,7 @@ def check() -> Result:
         status=PASS,
         note=(
             "TimescaleDB extension active, hypertable write/read ok, "
-            "time_bucket() works, plotly renders. DSN via OCEAN_SIM_DSN "
+            "time_bucket() works, plotly renders. DSN via OCEAN_DATA_WORKSHOP_DSN "
             "(no credential in repo)"
         ),
         detail=detail,

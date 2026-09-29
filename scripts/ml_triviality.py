@@ -32,7 +32,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from ocean_sim.data import ncei
+from ocean_data_workshop.data import ncei
 
 SITE = "mb01"
 DEPLOYMENTS = ["02", "03", "04", "05"]  # these carry both ships and dolphins_1h

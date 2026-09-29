@@ -69,7 +69,7 @@ a few millionths of a degree outside the requested box — needs a tolerance.
 
 PostgreSQL 17.11 + TimescaleDB 15.2.0 in Docker, arm64, healthy in ~6 s. Hypertable
 write/read works, `time_bucket()` works, plotly renders. DSN comes from
-`OCEAN_SIM_DSN` so no credential is ever in the repo.
+`OCEAN_DATA_WORKSHOP_DSN` so no credential is ever in the repo.
 
 ## 5. NCEI Passive Acoustic archive — PASS, and far better than expected
 

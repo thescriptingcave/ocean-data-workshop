@@ -48,13 +48,13 @@ for _p in (ROOT, ROOT / "src"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from ocean_sim.http import force_ipv4  # noqa: E402
+from ocean_data_workshop.http import force_ipv4  # noqa: E402
 
 _IPV4_APPLIED = force_ipv4()
 
-# Set OCEAN_SIM_OFFLINE=1 to forbid the network entirely. Used to test the fallback
+# Set OCEAN_DATA_WORKSHOP_OFFLINE=1 to forbid the network entirely. Used to test the fallback
 # path, and useful on a train.
-OFFLINE = os.environ.get("OCEAN_SIM_OFFLINE", "").strip().lower() in ("1", "true", "yes")
+OFFLINE = os.environ.get("OCEAN_DATA_WORKSHOP_OFFLINE", "").strip().lower() in ("1", "true", "yes")
 
 _TIMEOUT = (10, 120)  # connect, read
 
@@ -118,7 +118,7 @@ def session():
                 except Exception as exc:
                     reason = f"{type(exc).__name__}: {str(exc).splitlines()[0][:80]}"
             else:
-                reason = "offline mode (OCEAN_SIM_OFFLINE=1)"
+                reason = "offline mode (OCEAN_DATA_WORKSHOP_OFFLINE=1)"
 
             if not bin_p.exists():
                 raise requests.exceptions.ConnectionError(
@@ -141,7 +141,7 @@ def session():
             cached.url = request.url
             cached.request = request
             # Mark the provenance. describe() reads this, and without it the prefetch
-            # reported "LIVE" for every entry even with OCEAN_SIM_OFFLINE=1 -- an
+            # reported "LIVE" for every entry even with OCEAN_DATA_WORKSHOP_OFFLINE=1 -- an
             # output that lies about where the data came from is worse than no output.
             cached._from_cache = True
             cached._cached_age = age

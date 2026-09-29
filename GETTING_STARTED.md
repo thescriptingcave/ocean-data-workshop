@@ -132,7 +132,7 @@ that it is doing so — the numbers are real, just not new.
 PORT=5433 make
 ```
 
-The port is read from `OCEAN_SIM_PORT` by the database *and* by every script that
+The port is read from `OCEAN_DATA_WORKSHOP_PORT` by the database *and* by every script that
 connects, so the override stays consistent.
 
 ### Two copies of this repo on one machine?
@@ -157,7 +157,7 @@ ready and prints **"Environment is ready. Start with 01."**
 To check the offline path end to end:
 
 ```bash
-OCEAN_SIM_OFFLINE=1 uv run jupyter lab notebooks/
+OCEAN_DATA_WORKSHOP_OFFLINE=1 uv run jupyter lab notebooks/
 ```
 
 Every notebook should still work, each request printing a warning that it is using a
@@ -219,11 +219,11 @@ been rehearsed end to end yet — treat it as untested.
 | symptom | cause | fix |
 |---|---|---|
 | `port is already allocated` | local PostgreSQL on 5432 | `PORT=5433 make` |
-| `container name is already in use` | another checkout of this repo | `OCEAN_SIM_PROJECT=$(basename $PWD) PORT=5433 make` |
+| `container name is already in use` | another checkout of this repo | `OCEAN_DATA_WORKSHOP_PROJECT=$(basename $PWD) PORT=5433 make` |
 | `Docker is installed but the daemon is not responding` | Docker Desktop still starting | wait for it, then re-run |
 | `No cached copy and no working network` | no cache archive and the network failed | the archive ships with the repo; if you deleted it, re-run `uv run python scripts/prefetch.py` |
 | `ocean_profile_daily 0 <- empty` | no Copernicus account | expected. Everything else loaded; Notebook 08 still works |
-| `No module named 'ocean_sim...'` | project not installed | `uv sync` |
+| `No module named 'ocean_data_workshop...'` | project not installed | `uv sync` |
 | Every call takes exactly the timeout | **IPv6 without an IPv6 route** | already handled by the helper; if you see it in your own code, force IPv4 — see Notebook 01 |
 | `Jupyter command 'jupyter-lab' not found` | `jupyterlab` not installed | `uv sync` — `workshop-setup` now checks for this |
 | Notebooks are unexecuted and you want the output | reading the `.ipynb` on disk | they are committed executed; run `uv run python scripts/build_notebooks.py --execute` |
@@ -272,7 +272,7 @@ notebooks/            the workshop
   _fetch.py           cached fetch + the expect() assertions
   _sources.py         every endpoint, built by functions
   *.ipynb             10 notebooks, executed, with output
-src/ocean_sim/
+src/ocean_data_workshop/
   data/               loaders: glorys, ncei, ndbc
   http.py             IPv4-forcing HTTP session
   dsn.py              one place that knows the database address

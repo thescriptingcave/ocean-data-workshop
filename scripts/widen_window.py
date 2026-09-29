@@ -20,9 +20,9 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from ocean_sim.config import OCEAN_BOX, OCEAN_SITE
-from ocean_sim.data import glorys, ndbc
-from ocean_sim.stats import block_bootstrap_pvalue, effective_n
+from ocean_data_workshop.config import OCEAN_BOX, OCEAN_SITE
+from ocean_data_workshop.data import glorys, ndbc
+from ocean_data_workshop.stats import block_bootstrap_pvalue, effective_n
 
 YEARS = list(range(2019, 2026))
 CACHE = "data/glorys_wide"

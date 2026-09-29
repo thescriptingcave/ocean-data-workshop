@@ -1,4 +1,4 @@
-"""Tests for ocean_sim.stats.
+"""Tests for ocean_data_workshop.stats.
 
 These exist because the bootstrap is easy to get subtly wrong in ways that produce
 confident, plausible, wrong numbers. Each test pins a property whose failure would be
@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from ocean_sim.stats import (
+from ocean_data_workshop.stats import (
     block_bootstrap_pvalue,
     effective_n,
     estimate_block_length,

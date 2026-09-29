@@ -36,17 +36,17 @@ import sys
 import time
 from pathlib import Path
 
-# src/ocean_sim/workshop_setup.py -> repo root is two levels up
+# src/ocean_data_workshop/workshop_setup.py -> repo root is two levels up
 ROOT = Path(__file__).resolve().parents[2]
 
-os.environ.setdefault("OCEAN_SIM_OFFLINE", "0")
+os.environ.setdefault("OCEAN_DATA_WORKSHOP_OFFLINE", "0")
 
-DB_PORT = int(os.environ.get("OCEAN_SIM_PORT", "5432"))
+DB_PORT = int(os.environ.get("OCEAN_DATA_WORKSHOP_PORT", "5432"))
 
 # Compose project name, defaulting to this checkout's directory so that two clones on
 # one machine get separate containers and separate volumes instead of colliding.
 PROJECT = (
-    os.environ.get("OCEAN_SIM_PROJECT")
+    os.environ.get("OCEAN_DATA_WORKSHOP_PROJECT")
     or re.sub(r"[^a-z0-9_-]+", "-", ROOT.name.lower()).strip("-")
     or "ocean-sim"
 )
@@ -146,7 +146,7 @@ def check_prereqs() -> None:
 def start_db() -> None:
     step(2, 6, f"Starting PostgreSQL + TimescaleDB on port {DB_PORT}")
 
-    env = {**os.environ, "OCEAN_SIM_PORT": str(DB_PORT), "OCEAN_SIM_PROJECT": PROJECT}
+    env = {**os.environ, "OCEAN_DATA_WORKSHOP_PORT": str(DB_PORT), "OCEAN_DATA_WORKSHOP_PROJECT": PROJECT}
     r = subprocess.run(
         ["docker", "compose", "up", "-d", "--wait"],
         capture_output=True, text=True, cwd=ROOT, timeout=300, env=env,
@@ -158,7 +158,7 @@ def start_db() -> None:
                 f"host port {DB_PORT} is already in use",
                 "You probably have a local PostgreSQL. Either stop it, or pick another:\n"
                 "    uv run workshop-setup --port 5433\n"
-                "The port is read from OCEAN_SIM_PORT by the database and by every\n"
+                "The port is read from OCEAN_DATA_WORKSHOP_PORT by the database and by every\n"
                 "script that connects, so this stays consistent.",
             )
         if "already in use by container" in out or "Conflict" in out:
@@ -166,7 +166,7 @@ def start_db() -> None:
                 "another checkout of this repo is already running its database",
                 "Two checkouts otherwise share one compose project and one volume. Give\n"
                 "this checkout its own project so the two stay independent:\n"
-                "    OCEAN_SIM_PROJECT=$(basename $PWD) uv run workshop-setup --port 5433\n"
+                "    OCEAN_DATA_WORKSHOP_PROJECT=$(basename $PWD) uv run workshop-setup --port 5433\n"
                 "or tear the other one down first:\n"
                 "    docker compose -p ocean-sim down",
             )
@@ -179,7 +179,7 @@ def start_db() -> None:
     # the name -- which is what lets two checkouts coexist.
     r = run(
         ["docker", "compose", "exec", "-T", "db", "psql", "-U", "postgres",
-         "-d", "ocean_sim", "-tAc", "select 1"],
+         "-d", "ocean_data_workshop", "-tAc", "select 1"],
         check=False, quiet=True, timeout=60,
     )
     if r.returncode != 0:
@@ -192,7 +192,7 @@ def apply_schema() -> None:
     run(["uv", "run", "python", "-c",
          "import sys,psycopg,pathlib;"
          "sys.path.insert(0,'src');"
-         "from ocean_sim.dsn import dsn;"
+         "from ocean_data_workshop.dsn import dsn;"
          "sql=pathlib.Path('learning/schema.sql').read_text();"
          "c=psycopg.connect(dsn(),autocommit=True);"
          "c.execute(sql);c.close();"
@@ -262,7 +262,7 @@ def main() -> int:
 
     if args.port is not None:
         DB_PORT = args.port
-        os.environ["OCEAN_SIM_PORT"] = str(DB_PORT)
+        os.environ["OCEAN_DATA_WORKSHOP_PORT"] = str(DB_PORT)
 
     print("=" * 72)
     print("  Ocean data workshop -- environment setup")
@@ -288,7 +288,7 @@ def main() -> int:
     print("\n" + "=" * 72)
     ok(f"setup complete in {time.time() - t0:.0f} s")
     print("\n  Next:  uv run jupyter lab notebooks/")
-    print("\n  Offline, if the network is bad:  OCEAN_SIM_OFFLINE=1 uv run jupyter lab notebooks/")
+    print("\n  Offline, if the network is bad:  OCEAN_DATA_WORKSHOP_OFFLINE=1 uv run jupyter lab notebooks/")
     print()
     return 0
 

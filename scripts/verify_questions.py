@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import psycopg
 
-from ocean_sim.dsn import dsn
+from ocean_data_workshop.dsn import dsn
 
 DSN = dsn()
 
@@ -140,7 +140,7 @@ def band_structure(question: Question) -> tuple[bool, str]:
     A question whose answer is the same for every band is really one question, and
     usually a boring one.
     """
-    from ocean_sim.stats import block_bootstrap_pvalue
+    from ocean_data_workshop.stats import block_bootstrap_pvalue
 
     df = q(
         """

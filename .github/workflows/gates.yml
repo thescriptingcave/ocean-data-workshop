@@ -1,0 +1,147 @@
+name: gates
+
+# Deliberately no database, no notebooks, and no network in the required job.
+#
+# The first version of this workflow tried to do everything -- start TimescaleDB,
+# run the notebooks, render figures -- and failed as a unit for ~4 minutes every
+# time, which trains you to ignore red. A gate that is fast and always green when
+# the code is sound is worth far more than one that is comprehensive and usually
+# broken.
+#
+# So: cheap gates here that catch the real classes of mistake, and a heavier
+# integration job that is allowed to be slow.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Once a week. Catches a dependency or service that has moved underneath us,
+    # which a commit-triggered run never will.
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: ruff
+        run: uv run ruff check src/ scripts/
+
+  unit:
+    name: unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: pytest
+        run: uv run pytest -q
+
+  notebooks:
+    name: notebooks, offline
+    runs-on: ubuntu-latest
+    # The real test: no network is the condition the workshop is designed for, and
+    # OCEAN_DATA_WORKSHOP_OFFLINE=1 enforces it inside the code rather than relying
+    # on the runner having no egress. If someone adds a cell that reaches the
+    # network, it fails here instead of in a room in front of thirty people.
+    env:
+      OCEAN_DATA_WORKSHOP_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - run: uv sync --frozen
+
+      - name: restore the prefetched cache
+        run: tar -xzf notebooks/cache-archive.tar.gz -C notebooks
+
+      - name: install the notebook kernel
+        run: uv run python -m ipykernel install --user --name python3
+
+      - name: record the cache state
+        # Checksum rather than `git diff`: notebooks/.cache is gitignored, so git can
+        # never see it change and the check would pass forever while testing nothing.
+        run: find notebooks/.cache -name '*.bin' -exec sha256sum {} + | sort > /tmp/cache.before
+
+      - name: execute every notebook
+        # Notebooks 00-07 and 09 need no database. 08 is gated by the integration
+        # job below, which has one -- so this job stays fast and never flakes on
+        # a container.
+        run: |
+          uv run python scripts/build_notebooks.py --execute \
+            --only 00_orientation 01_request_three_ways 02_erddap_griddap \
+                   03_gcs_object_storage 04_argo_gdac_netcdf \
+                   05_copernicus_credentialed 06_ndbc_fixed_format \
+                   07_gsw_domain_library 09_trap_table
+
+      - name: the cache was not modified by running them
+        # A notebook that refetches changes the cache, which means the offline
+        # guarantee is weaker than it looks. Invisible until the day of the workshop.
+        run: |
+          find notebooks/.cache -name '*.bin' -exec sha256sum {} + | sort > /tmp/cache.after
+          if ! diff -q /tmp/cache.before /tmp/cache.after >/dev/null; then
+            echo "::error::running the notebooks rewrote the cache -- something reached the network"
+            diff /tmp/cache.before /tmp/cache.after | head -20
+            exit 1
+          fi
+          echo "cache unchanged: the notebooks really are running offline"
+
+  integration:
+    name: integration, with the database
+    runs-on: ubuntu-latest
+    # A full clean-clone setup, which is the only test that catches "works on my
+    # machine". It has found a .gitignore rule that had excluded three source
+    # files from every commit, and a compose file that could not be started twice.
+    env:
+      OCEAN_DATA_WORKSHOP_OFFLINE: "1"
+    services:
+      db:
+        image: timescale/timescaledb:2.30.1-pg17
+        env:
+          POSTGRES_PASSWORD: workshop
+          POSTGRES_DB: ocean_data_workshop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ocean_data_workshop"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - run: uv sync --frozen
+      - run: tar -xzf notebooks/cache-archive.tar.gz -C notebooks
+      - run: uv run python -m ipykernel install --user --name python3
+
+      - name: load the data
+        # Points at the service container above rather than docker compose, so there
+        # is no second container and no port to collide with. load_db.py applies
+        # the schema itself -- an earlier version of this step did it inline too,
+        # which was redundant.
+        env:
+          OCEAN_DATA_WORKSHOP_DSN: postgresql://postgres:workshop@localhost:5432/ocean_data_workshop
+        run: uv run python scripts/load_db.py
+
+      - name: the capstone, which needs the database
+        run: uv run python scripts/build_notebooks.py --execute --only 08_capstone_join

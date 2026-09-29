@@ -1,6 +1,6 @@
 """Shared HTTP session.
 
-Moved out of ``probes/`` because the data loaders need it too, and ``src/ocean_sim`` must
+Moved out of ``probes/`` because the data loaders need it too, and ``src/ocean_data_workshop`` must
 not import from ``probes/``.
 
 The IPv4 fix is not optional. This machine has AAAA records but no IPv6 route: curl races

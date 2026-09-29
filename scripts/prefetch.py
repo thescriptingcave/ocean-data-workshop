@@ -91,7 +91,7 @@ def main() -> int:
         print("  The notebooks that need these will make a live call instead, and will")
         print("  say so. Everything else is safe offline.")
 
-    print("\n  test it:  OCEAN_SIM_OFFLINE=1 uv run jupyter lab notebooks/\n")
+    print("\n  test it:  OCEAN_DATA_WORKSHOP_OFFLINE=1 uv run jupyter lab notebooks/\n")
     return 0 if not failed else 1
 
 

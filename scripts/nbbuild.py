@@ -70,7 +70,7 @@ def build(*cells: Any, title: str) -> nbf.NotebookNode:
             "name": KERNEL,
         },
         "language_info": {"name": "python", "version": sys.version.split()[0]},
-        "ocean_sim": {"title": title},
+        "ocean_data_workshop": {"title": title},
     }
     return nb
 

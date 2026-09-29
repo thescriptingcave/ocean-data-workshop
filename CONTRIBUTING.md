@@ -53,7 +53,7 @@ working tree.
 ## Adding a data source
 
 1. Verify it first — anonymously if possible, and check the size before downloading.
-   `data/` caches raw responses; the loaders in `src/ocean_sim/data/` parse them.
+   `data/` caches raw responses; the loaders in `src/ocean_data_workshop/data/` parse them.
 2. Record what cost you. The value of this project is the list of things that are not in
    the documentation, and a trap nobody writes down is a trap somebody pays for again.
 3. Add the endpoint to `notebooks/_sources.py` with a builder function, and to its

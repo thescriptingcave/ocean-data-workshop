@@ -274,7 +274,7 @@ Manages Python versions, virtual environments and dependencies. `uv run` picks t
 interpreter without you maintaining an env.
 
 **DSN** (data source name)
-The connection string for a database. Held in one place (`src/ocean_sim/dsn.py`) so that
+The connection string for a database. Held in one place (`src/ocean_data_workshop/dsn.py`) so that
 every script agrees; when it was copy-pasted into three scripts, making the port
 configurable moved one copy and not the others.
 

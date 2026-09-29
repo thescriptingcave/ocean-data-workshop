@@ -128,7 +128,7 @@ notebooks/            the workshop
   _fetch.py           cached fetch + expect() assertions
   _sources.py         every endpoint, built by functions
   *.ipynb             10 notebooks, executed, with output
-src/ocean_sim/
+src/ocean_data_workshop/
   data/               loaders: glorys, ncei, ndbc
   http.py             IPv4-forcing session
   dsn.py              one place that knows the database address

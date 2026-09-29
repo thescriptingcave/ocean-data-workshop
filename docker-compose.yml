@@ -1,4 +1,4 @@
-name: ${OCEAN_SIM_PROJECT:-ocean-sim}
+name: ${OCEAN_DATA_WORKSHOP_PROJECT:-ocean-data-workshop}
 
 services:
   db:
@@ -14,12 +14,12 @@ services:
     # independent. Everything that needs the container goes through `docker compose
     # exec`, which resolves it.
     ports:
-      - "${OCEAN_SIM_PORT:-5432}:5432"
+      - "${OCEAN_DATA_WORKSHOP_PORT:-5432}:5432"
     environment:
       POSTGRES_PASSWORD: ocean      # local workshop only, never a real secret
-      POSTGRES_DB: ocean_sim
+      POSTGRES_DB: ocean_data_workshop
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ocean_sim"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ocean_data_workshop"]
       interval: 3s
       timeout: 3s
       retries: 15

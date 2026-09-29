@@ -358,7 +358,7 @@ their ERDDAP calls are mysteriously slow, this is why.
 """),
         code('''
 import socket
-from ocean_sim.http import force_ipv4
+from ocean_data_workshop.http import force_ipv4
 
 # What the machine resolves...
 addrs = socket.getaddrinfo(S.ERDDAP.split("/")[2], 443, type=socket.SOCK_STREAM)
@@ -2198,7 +2198,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from ocean_sim.credentials import DOTENV, child_env, describe, load
+from ocean_data_workshop.credentials import DOTENV, child_env, describe, load
 
 has_cli = shutil.which("copernicusmarine") is not None
 creds = load()
@@ -2291,7 +2291,7 @@ global at 1/12° with 50 levels and daily resolution from 1993; the box is 0.22�
 and 60 m deep, for a two-year window.
 """),
         code('''
-from ocean_sim.config import OCEAN_BOX
+from ocean_data_workshop.config import OCEAN_BOX
 
 box = OCEAN_BOX
 subset = [
@@ -2356,7 +2356,7 @@ were run against the live service, same credentials, same day:
 | `cmems_mod_glo_phy_my_0.083deg_P1D-m` | 200, file downloaded |
 
 The working form is the CMEMS **product code**, and it is already right in
-`src/ocean_sim/config.py`. A constant written separately in `_sources.py` had it wrong —
+`src/ocean_data_workshop/config.py`. A constant written separately in `_sources.py` had it wrong —
 so the loader worked while the notebook did not, from the same repository, on the same
 machine, with the same credentials.
 
@@ -2470,7 +2470,7 @@ import warnings
 
 import psycopg
 
-from ocean_sim.dsn import dsn, port
+from ocean_data_workshop.dsn import dsn, port
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", UserWarning)
@@ -2520,7 +2520,7 @@ def q(sql, **params):
         warnings.simplefilter("ignore", UserWarning)
         return pd.read_sql_query(sql, conn, params=params)
 
-from ocean_sim.dsn import dsn
+from ocean_data_workshop.dsn import dsn
 
 conn = psycopg.connect(dsn())
 
@@ -2546,7 +2546,7 @@ SELECT avg(a), avg(b) FROM t     --  two columns, both called "avg"
 `df["avg"]` silently gives you the first. Every aggregate in this notebook is aliased.
 """),
         code('''
-from ocean_sim.dsn import dsn
+from ocean_data_workshop.dsn import dsn
 
 conn = psycopg.connect(dsn())
 demo = q("SELECT avg(wind_speed_mean_ms) AS mean_speed, avg(wind_gust_max_ms) AS mean_gust FROM wind_daily")
@@ -2629,7 +2629,7 @@ print(f"  {aligned.shape[1]} frequency bands")
 print()
 
 # And the same thing in SQL, against the loaded database, so both routes agree.
-from ocean_sim.dsn import dsn
+from ocean_data_workshop.dsn import dsn
 
 conn = psycopg.connect(dsn())
 joined = q("""
@@ -2677,7 +2677,7 @@ So: a correlation is a statement about direction and rough strength, and the p-v
 needs the block bootstrap. **Neither is a statement about mechanism** — see below.
 """),
         code('''
-from ocean_sim.stats import block_bootstrap_pvalue, effective_n
+from ocean_data_workshop.stats import block_bootstrap_pvalue, effective_n
 
 # Pivot the long SQL result back to one column per band, so each band is a series
 # and the analysis below is identical whichever route produced the numbers.

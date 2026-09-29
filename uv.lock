@@ -1814,7 +1814,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ocean-sim"
+name = "ocean-data-workshop"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

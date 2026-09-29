@@ -27,9 +27,9 @@ import psycopg
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from ocean_sim.config import OCEAN_BOX
-from ocean_sim.data import glorys, ncei, ndbc
-from ocean_sim.dsn import dsn
+from ocean_data_workshop.config import OCEAN_BOX
+from ocean_data_workshop.data import glorys, ncei, ndbc
+from ocean_data_workshop.dsn import dsn
 
 ROOT = Path(__file__).resolve().parent.parent
 DSN = dsn()
@@ -137,7 +137,7 @@ def load_wind() -> int:
     daily = daily.loc[WINDOW_START:WINDOW_END]
 
     # hourly direction -> a proper circular mean, never a plain average of degrees
-    from ocean_sim.data.ndbc import circular_mean
+    from ocean_data_workshop.data.ndbc import circular_mean
 
     dir_mean = (
         ndbc.load(ndbc.fetch(WIND_STATION, 2019, "data/ndbc"))["wdir"]

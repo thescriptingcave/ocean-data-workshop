@@ -110,7 +110,7 @@ the month**, which is what makes the central SQL question answerable.
 ```bash
 uv sync
 docker compose up -d          # TimescaleDB on :5432
-export OCEAN_SIM_DSN="postgresql://postgres:ocean@localhost:5432/ocean_sim"
+export OCEAN_DATA_WORKSHOP_DSN="postgresql://postgres:ocean@localhost:5432/ocean_data_workshop"
 ```
 
 ## Two machine gotchas, already handled in `probes/_common.py`

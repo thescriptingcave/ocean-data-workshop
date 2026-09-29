@@ -22,7 +22,7 @@ What the two stations actually give us:
   46092 (MBM1)   10 km       speed + direction complete    primary wind source
   =============  ==========  ==========================  ====================
 
-File-format facts (see ``ocean_sim.data.ndbc`` for the full list): data starts on
+File-format facts (see ``ocean_data_workshop.data.ndbc`` for the full list): data starts on
 **line 2**, not line 4; missing sentinels are 99 for most fields but **999** for ``WDIR``
 and ``MWD``; resolution is **not uniform** within a year file (46042 is hourly in January
 and 10-minute by December); and wind direction is where the wind comes *from*.
@@ -60,7 +60,7 @@ def check() -> Result:
     import numpy as np
     import pandas as pd
 
-    from ocean_sim.data import ndbc
+    from ocean_data_workshop.data import ndbc
 
     detail: dict = {}
     problems: list[str] = []
@@ -131,8 +131,8 @@ def check() -> Result:
         )
 
     # --- does it actually explain the ocean? ---
-    from ocean_sim.config import OCEAN_BOX, SEPT_2019
-    from ocean_sim.data import glorys
+    from ocean_data_workshop.config import OCEAN_BOX, SEPT_2019
+    from ocean_data_workshop.data import glorys
 
     ds = glorys.load(
         glorys.fetch(

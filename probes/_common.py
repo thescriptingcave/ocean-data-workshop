@@ -53,18 +53,18 @@ PASS, FAIL, WARN = "PASS", "FAIL", "WARN"
 # ---------------------------------------------------------------------------
 # HTTP session
 # ---------------------------------------------------------------------------
-# The implementation lives in ocean_sim.http so that src/ocean_sim does not have to
+# The implementation lives in ocean_data_workshop.http so that src/ocean_data_workshop does not have to
 # import from probes/ -- the dependency was the wrong way round. Re-exported here for
 # the probes' convenience.
 
 def force_ipv4() -> bool:
-    from ocean_sim.http import force_ipv4 as _f
+    from ocean_data_workshop.http import force_ipv4 as _f
 
     return _f()
 
 
 def http_session(*args, **kwargs):
-    from ocean_sim.http import http_session as _s
+    from ocean_data_workshop.http import http_session as _s
 
     return _s(*args, **kwargs)
 

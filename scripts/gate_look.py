@@ -25,13 +25,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import cmocean
 
-from ocean_sim.config import (
+from ocean_data_workshop.config import (
     ACOUSTIC_ANCHOR,
     OCEAN_BOX,
     OCEAN_SITE,
     SEPT_2019,
 )
-from ocean_sim.data import glorys
+from ocean_data_workshop.data import glorys
 
 FIGDIR = Path(__file__).resolve().parent.parent / "figures"
 FIGDIR.mkdir(exist_ok=True)

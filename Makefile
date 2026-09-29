@@ -17,7 +17,7 @@
 #   make setup PORT=5433
 
 PORT      ?= 5432
-export OCEAN_SIM_PORT = $(PORT)
+export OCEAN_DATA_WORKSHOP_PORT = $(PORT)
 
 UV        ?= uv
 UVRUN     ?= $(UV) run
@@ -54,7 +54,7 @@ lab: kernel
 ## The network-is-bad case is also one command. Everything is served from the cache, and
 ## each request prints a warning saying so -- the numbers are real, just not new.
 lab-offline: kernel
-	@OCEAN_SIM_OFFLINE=1 $(UVRUN) jupyter lab $(NB_DIR)/
+	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) jupyter lab $(NB_DIR)/
 
 ## notebook: execute every notebook, saving output -- the supported way to run them
 notebook:
@@ -103,9 +103,9 @@ lint:
 ## failure path that a healthy network never exercises.
 check:
 	@echo "  --- notebooks, network FORBIDDEN ---"
-	@OCEAN_SIM_OFFLINE=1 $(UVRUN) python scripts/build_notebooks.py --execute
+	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) python scripts/build_notebooks.py --execute
 	@echo "  --- prefetch from cache only ---"
-	@OCEAN_SIM_OFFLINE=1 $(UVRUN) python scripts/prefetch.py
+	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) python scripts/prefetch.py
 
 ## fresh: clone to a temp directory and run setup from nothing
 ##

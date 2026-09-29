@@ -27,8 +27,8 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from ocean_sim.data import glorys, ncei, ndbc
-from ocean_sim.stats import block_bootstrap_pvalue
+from ocean_data_workshop.data import glorys, ncei, ndbc
+from ocean_data_workshop.stats import block_bootstrap_pvalue
 
 # MB01 deployments that are contiguous with the ocean/wind record. 01-07 run from
 # 2018-11-15 to 2021-04-23 with only brief gaps; 08 and 09 are later and are excluded so
@@ -77,7 +77,7 @@ def acoustic_daily() -> tuple[pd.DataFrame, np.ndarray]:
 def ocean_daily() -> pd.DataFrame:
     paths = glorys.fetch(
         ["temperature", "salinity", "u_eastward", "v_northward"],
-        __import__("ocean_sim.config", fromlist=["OCEAN_BOX"]).OCEAN_BOX,
+        __import__("ocean_data_workshop.config", fromlist=["OCEAN_BOX"]).OCEAN_BOX,
         "2019-01-01T00:00:00", "2021-07-01T00:00:00", "data/glorys_acoustic",
     )
     ds = glorys.load(paths, label="acoustic-window")

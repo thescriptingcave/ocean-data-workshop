@@ -30,8 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from ocean_sim.config import OCEAN_SITE
-from ocean_sim.dsn import dsn
+from ocean_data_workshop.config import OCEAN_SITE
+from ocean_data_workshop.dsn import dsn
 
 ROOT = Path(__file__).resolve().parent.parent
 FIGDIR = ROOT / "figures"

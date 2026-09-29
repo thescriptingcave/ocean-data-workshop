@@ -231,11 +231,11 @@ def ndbc_url(station: str = WIND_STATION, year: int = 2019) -> str:
 #     cmems_mod_glo_phy_my_0.083deg_P1D-m    -> 200, 1 file downloaded
 #
 # So the human-facing Product ID and the ID the CLI wants are different strings. It
-# was already right in src/ocean_sim/config.py, and this module had it wrong.
+# was already right in src/ocean_data_workshop/config.py, and this module had it wrong.
 #
 # Imported rather than repeated, so the two cannot drift -- which is exactly how they
 # drifted in the first place.
-from ocean_sim.config import GLORYS_DATASETS  # noqa: E402
+from ocean_data_workshop.config import GLORYS_DATASETS  # noqa: E402
 
 GLORYS_DATASET = GLORYS_DATASETS["daily"]
 
