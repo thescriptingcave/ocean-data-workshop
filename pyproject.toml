@@ -34,6 +34,10 @@ dev = [
 [tool.ruff]
 line-length = 90
 target-version = "py312"
+# Notebooks are not linted. They import mid-file by design (path setup, then helpers),
+# and linting the .ipynb adds noise without adding confidence -- the build already
+# fails on any unhandled error when it executes them.
+extend-exclude = ["*.ipynb"]
 
 [project.scripts]
 # Cross-platform entry points. `uv run workshop-setup` is the same on macOS, Linux and

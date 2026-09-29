@@ -59,7 +59,7 @@ def preamble() -> list:
 # ===========================================================================
 # 01 -- The request, three ways
 # ===========================================================================
-def nb_01() -> "object":
+def nb_01() -> object:
     b = build(
         md("""
 # 01 — One request, three ways
@@ -451,5 +451,253 @@ print("  14-17 C in September is upwelling-consistent for central California.")
 print("  Had any of these failed, the number would have been wrong, not the plot.")
 '''),
         title="01 The request, three ways",
+    )
+    return b
+
+
+# ===========================================================================
+# 02 -- REST griddap
+# ===========================================================================
+def nb_02() -> "object":
+    b = build(
+        md("""
+# 02 — Query a grid, dimensionally
+
+**Access pattern: REST griddap.** One dataset, addressed by index expression, returned
+in whatever format you negotiate.
+
+ERDDAP is the reference implementation and it fronts dozens of NOAA and NASA datasets.
+The pattern is common to OPeNDAP servers generally, and the same three or four traps
+apply to most of them.
+"""),
+        *preamble(),
+
+        md("""
+## 1. What you should get
+
+| | |
+|---|---|
+| Endpoint | `coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41` |
+| Variable | `analysed_sst` — daily analysed SST, 0.045°, 2002–present |
+| Dimensions | `time`, `latitude`, `longitude` — always in that order, for every griddap |
+| As netCDF | 30 × 23 × 23, 134,020 bytes |
+
+The dimension order is a **property of the server, not of your query**, and it is the
+single most common reason a griddap query returns an error: the brackets have to
+follow the server's axis order, and you cannot tell from the URL which order that is.
+You have to ask.
+"""),
+        code('''
+# The server tells you its own shape. Always ask before you index.
+info = _fetch.get(f"{S.ERDDAP}.das", quiet=True).text
+for line in info.splitlines():
+    if any(k in line for k in ("dimensions:", "time {", "latitude {", "longitude {")):
+        print("   ", line.strip())
+'''),
+
+        md("""
+## 2. The index expression
+
+A griddap query names the variable, then brackets each dimension in server order:
+
+```
+<endpoint>.<format>?<variable>[<time>][<lat>][<lon>]
+```
+
+Each bracket is `[start:(stop)]` in the dimension's own units — a real timestamp for
+`time`, decimal degrees for the spatial ones. A range whose start equals its stop is a
+*degenerate range*, which is how you ask for exactly one cell.
+"""),
+        code('''
+lat0, lat1, lon0, lon1 = S.SST_BOX
+parts = {
+    "endpoint + format": f"{S.ERDDAP}.csv",
+    "variable":          "analysed_sst",
+    "time":              "[(2019-09-01T00:00:00Z):(2019-09-30T00:00:00Z)]",
+    "latitude":          f"[({lat0}):({lat1})]",
+    "longitude":         f"[({lon0}):({lon1})]",
+}
+for k, v in parts.items():
+    print(f"  {k:18} {v}")
+
+print()
+print("  concatenated:")
+print("   ", S.sst_csv())
+'''),
+
+        md("""
+### ⚠️ Trap — the axis order is not the order you expect
+
+Reversing the spatial brackets does **not** error. It returns a plausible field, because
+the numbers still land inside the dataset's latitude range. It is simply the wrong
+answer, transposed.
+
+This is the dangerous class of error: the server was asked a well-formed question, and
+answered it correctly. The only defence is to check the axis order against the `.das`
+metadata *before* trusting a spatial result, and to sanity-check that the latitude range
+you got back is the one you asked for.
+"""),
+        code('''
+# Prove the ordering matters by checking what comes back, not by trusting the URL.
+txt = _fetch.get(S.sst_csv(), quiet=True).text
+import io
+d = pd.read_csv(io.StringIO(txt), skiprows=[1])
+print("  latitude  range returned:", d.latitude.min(), "..", d.latitude.max())
+print("  longitude range returned:", d.longitude.min(), "..", d.longitude.max())
+print("  latitude  range asked for:", lat0, "..", lat1)
+print("  longitude range asked for:", lon0, "..", lon1)
+print()
+print("  -> matches. Had the brackets been swapped, latitude and longitude above")
+print("     would be reversed while still looking entirely reasonable.")
+'''),
+
+        md("""
+## 3. Format negotiation
+
+The extension before the `?` is the format. Same query, different serialisation:
+
+| extension | you get | size for this month |
+|---|---|---|
+| `.csv` | flat table, **two** header rows | 690,813 B |
+| `.nc` | CF-1.6 netCDF, labelled dimensions | 134,020 B |
+| `.json` | nested objects | larger |
+| `.html` | a table you can look at in a browser | — |
+
+`.nc` is smaller *and* self-describing: units, axis order and coordinates travel with
+the data, so `xarray` does not have to be told what the columns mean. For anything past
+exploration, ask for `.nc` first.
+"""),
+        code('''
+import xarray as xr
+
+nc = _fetch.get(S.sst_nc(), quiet=True)
+p = Path.cwd() / "_sst_month.nc"
+p.write_bytes(nc.content)
+ds = xr.open_dataset(p)
+
+print("  csv:", f"{len(_fetch.get(S.sst_csv(), quiet=True).content):,} bytes")
+print("  nc :", f"{len(nc.content):,} bytes")
+print()
+print("  and the netCDF answers questions the CSV cannot:")
+print("    units       :", ds[S.SST_VAR].attrs.get("units"))
+print("    conventions :", ds.attrs.get("Conventions"))
+print("    creator     :", ds.attrs.get("creator_name"))
+'''),
+
+        md("""
+### ⚠️ Trap — coordinates come back as `float32`
+
+ERDDAP stores its grid in single precision. A box you requested as `36.60` to `36.82`
+can come back with a `latitude.min()` of `36.599998` and a `latitude.max()` of
+`36.820002` — outside the box you asked for, by a few millionths of a degree.
+
+The result is a spatial filter that mysteriously excludes the edge of your own
+selection. Use a tolerance rather than exact comparison:
+
+```python
+assert lat0 - 1e-3 <= ds.latitude.min() and ds.latitude.max() <= lat1 + 1e-3
+```
+"""),
+        code('''
+lat_min, lat_max = float(ds.latitude.min()), float(ds.latitude.max())
+print(f"  requested : {lat0} .. {lat1}")
+print(f"  returned  : {lat_min!r} .. {lat_max!r}")
+print(f"  dtype     : {ds.latitude.dtype}")
+print()
+print("  exact comparison passes? ", lat0 <= lat_min and lat_max <= lat1)
+print("  with a 1e-3 tolerance?    ", lat0 - 1e-3 <= lat_min and lat_max <= lat1 + 1e-3)
+print()
+print("  The fill value is the other half of this trap, and the two are not")
+print("  interchangeable:")
+sst = ds[S.SST_VAR]
+print(f"    dtype                  : {sst.dtype}")
+print(f"    NaN cells              : {int(sst.isnull().sum())}")
+print(f"    cells <= -1 C (fill)   : {int((sst <= -1.0).sum())}")
+print(f"    overall min            : {float(sst.min()):.2f}")
+print()
+print("  A NaN fill is skipped automatically by every reduction. A -999.0 fill is NOT:")
+import numpy as _np
+with_fill    = float(sst.mean(dim="time").mean())
+without_fill = float(sst.where(sst > -1.0).mean(dim="time").mean())
+print(f"    mean including fill   : {with_fill:.4f}")
+print(f"    mean excluding fill   : {without_fill:.4f}")
+print(f"    difference            : {with_fill - without_fill:.4f} C")
+print()
+print("  So 'is my field physical?' is a check worth automating, not eyeballing.")
+'''),
+
+        md("""
+### ⚠️ Trap — `itemsPerLargePage` silently returns nothing
+
+ERDDAP pages large CSV responses. Ask for page 2 without asking for page 1 and you get
+an **empty response with HTTP 200** — not an error, not a warning, just nothing. If you
+are paging a large dataset and a page comes back empty, this is almost always why.
+"""),
+        md("""
+## 4. The field, and what it is showing you
+
+Now the reason we came. A month of SST over the bay, as a map.
+"""),
+        code('''
+mean_field = ds[S.SST_VAR].where(ds[S.SST_VAR] > -1.0).mean(dim="time")
+spread = ds[S.SST_VAR].where(ds[S.SST_VAR] > -1.0).std(dim="time")
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 5.2), constrained_layout=True)
+
+for ax, field, title in [
+    (axes[0], mean_field, "mean SST, September 2019"),
+    (axes[1], spread,    "day-to-day variability (sd)"),
+]:
+    im = ax.pcolormesh(field.longitude, field.latitude, field.values,
+                       cmap="RdYlBu_r", shading="nearest")
+    ax.scatter([S.SITE_LON], [S.SITE_LAT], marker="*", s=180, c="black",
+               edgecolors="white", linewidths=0.8, zorder=3, label="ocean site")
+    ax.set_title(title, loc="left", fontweight="bold")
+    ax.set_xlabel("longitude"); ax.set_ylabel("latitude")
+    fig.colorbar(im, ax=ax, shrink=0.86)
+
+axes[0].legend(loc="lower right", fontsize=8)
+plt.suptitle("jplMURSST41 — ERDDAP griddap, 0.045°", x=0.02, ha="left",
+             fontsize=9, color="#666")
+plt.show()
+'''),
+
+        code('''
+# The physical reading. Scalar reductions on a 2-D DataArray need numpy -- xarray
+# wants an explicit `dim` for anything but a 1-D array.
+vals  = mean_field.values
+lats  = mean_field.latitude.values
+lons  = mean_field.longitude.values
+cold, warm = float(vals.min()), float(vals.max())
+ci, cj = np.unravel_index(int(vals.argmin()), vals.shape)
+wi, wj = np.unravel_index(int(vals.argmax()), vals.shape)
+
+print(f"  mean field spans {cold:.2f} .. {warm:.2f} C   (range {warm - cold:.2f} C)")
+print(f"  coldest cell: lat {lats[ci]:.2f}  lon {lons[cj]:.2f}   (NE, inshore)")
+print(f"  warmest cell: lat {lats[wi]:.2f}  lon {lons[wj]:.2f}   (SW, offshore)")
+print()
+print("  It is a smooth, monotonic SW -> NE gradient: offshore water is warmer, and")
+print("  the water at the northern, inshore corner of the bay is coldest. That is the")
+print("  upwelling centre, and it sits at the mouth of Monterey Bay. Northerly wind")
+print("  drags surface water away from the coast and cold water rises to replace it,")
+print("  so the coldest water is the closest-to-land water at the northern end.")
+print()
+print(f"  Note the gradient is only {warm - cold:.2f} C. That is small in absolute terms")
+print("  and easy to dismiss -- and it is the entire spatial signal in this box.")
+print("  Whether that matters depends on the question, which is the next notebook.")
+'''),
+
+        code('''
+_fetch.expect("netCDF bytes", len(nc.content), 134020)
+_fetch.expect("time steps", int(ds.sizes["time"]), 30)
+_fetch.expect("latitude points", int(ds.sizes["latitude"]), 23)
+_fetch.expect("longitude points", int(ds.sizes["longitude"]), 23)
+_fetch.expect_range("mean SST", float(mean_field.values.mean()), 15.0, 17.0)
+_fetch.expect_range("field range", warm - cold, 0.5, 8.0)
+print()
+print("  A field with a range near zero would mean the fill values leaked in.")
+print("  A mean outside 12-20 C would mean the wrong box or the wrong month.")
+'''),
+        title="02 ERDDAP griddap",
     )
     return b

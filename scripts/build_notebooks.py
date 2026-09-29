@@ -21,8 +21,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
+import workshop_notebooks as nbdefs  # noqa: E402
 from nbbuild import NOTEBOOKS, write  # noqa: E402
-import workshop_notebooks as W  # noqa: E402
 
 # Name -> builder attribute in workshop_notebooks. Resolved lazily with getattr so a
 # notebook that has not been written yet does not stop the ones that have.
@@ -67,7 +67,7 @@ def execute(path: Path, timeout: int = 900) -> tuple[bool, str]:
         client.execute()
     except CellExecutionError as exc:
         err = str(exc).splitlines()[0][:100]
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         err = f"{type(exc).__name__}: {str(exc)[:90]}"
 
     # A cell that raised is not a failure of the *run*, but it is a failure of the
@@ -113,7 +113,7 @@ def main() -> int:
 
     built: list[Path] = []
     for name in wanted:
-        fn = getattr(W, f"nb_{name[:2]}", None)
+        fn = getattr(nbdefs, f"nb_{name[:2]}", None)
         if fn is None:
             print(f"  SKIP {name:28} no builder yet")
             continue
