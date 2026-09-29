@@ -1777,13 +1777,39 @@ nothing ever looks wrong.
 two look almost identical at the call site.
 """),
         code('''
-kelvin_result = gsw.sound_speed(SA, temp_c + 273.15, dbar)
+# The RuntimeWarning below is the POINT of the cell, so it is captured rather than
+# allowed to scroll past as bare stderr. A warning nobody can interpret is a warning
+# people read as "this notebook is broken" -- and in a room, that is exactly what
+# happens.
+import warnings
+
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter("always")
+    kelvin_result = gsw.sound_speed(SA, temp_c + 273.15, dbar)
+
 print("  CT in degrees C  ->", f"{c[0]:.1f} m/s   (real)")
-print("  CT in Kelvin     ->", f"{kelvin_result[0]:.1f} m/s   (nan, no exception)")
+print("  CT in Kelvin     ->", f"{kelvin_result[0]:.1f} m/s   (NaN, and no exception)")
 print()
-print("  The correct way to convert, if you truly have Kelvin:")
-ct_from_kelvin = gsw.CT_from_t(SA, temp_c + 273.15, p=0)
-print("   gsw.CT_from_t(SA, T_K, p=0) ->", f"{float(ct_from_kelvin[0]):.2f} degC")
+print("  What the interpreter said, verbatim, and nothing more:")
+for w in caught:
+    print(f"    {w.category.__name__}: {w.message}")
+print()
+print("  One line of stderr, no traceback, no non-zero exit -- and every number")
+print("  computed from it downstream is NaN. That is why this trap is dangerous")
+print("  and not merely annoying: nothing stops you.")
+print()
+print("  There is no gsw function that takes Kelvin. Subtract 273.15 yourself, and")
+print("  then use the ordinary entry point -- which takes degrees Celsius, not Kelvin:")
+ct = gsw.CT_from_t(SA, temp_c, dbar)
+print("   gsw.CT_from_t(SA, t_degC, p) ->", f"{float(ct[0]):.2f} degC")
+print()
+print("  and it gives the temperature back, which is the check worth running:")
+print("   round trip through CT_from_t:", f"{float(ct[0]):.2f} vs {float(temp_c[0]):.2f} degC")
+print()
+print("  Passing Kelvin here does not raise either. It returns")
+print(f"  {float(gsw.CT_from_t(SA, temp_c + 273.15, dbar)[0]):.1f} degC, which is not a")
+print("  temperature. I had that line wrong in an earlier draft of this notebook --")
+print("  the same class of error it is warning about, one function over.")
 '''),
 
         md("""
