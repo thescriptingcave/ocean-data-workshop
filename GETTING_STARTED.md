@@ -62,6 +62,7 @@ That one command:
 3. applies the schema from `learning/schema.sql`
 4. downloads ~15 MB of real data and loads it
 5. warms the API cache so the notebooks do not depend on the network
+6. registers the Jupyter kernel and checks that `jupyter lab` actually runs
 
 Re-run it any time — every stage is idempotent.
 
@@ -87,7 +88,13 @@ defaults to the checkout's directory name. Add `--port` as well if both are on 5
 uv run jupyter lab notebooks/
 ```
 
-Open `00_orientation.ipynb` and run all cells. The last cell asserts the environment is
+Open `00_orientation.ipynb` and run all cells.
+
+Jupyter Lab prints a URL that contains a **token**, and opens your browser at it. The
+token is in the terminal you launched from — so keep that terminal open. If you ever land
+on a `login?next=...` page instead, the token is the long string in the original URL;
+paste it back and the page resolves. This is Jupyter's own behaviour, not a project
+setting, and it is the one thing worth knowing before you walk in. The last cell asserts the environment is
 ready and prints **"Environment is ready. Start with 01."**
 
 To check the offline path end to end:
@@ -161,8 +168,9 @@ been rehearsed end to end yet — treat it as untested.
 | `ocean_profile_daily 0 <- empty` | no Copernicus account | expected. Everything else loaded; Notebook 08 still works |
 | `No module named 'ocean_sim...'` | project not installed | `uv sync` |
 | Every call takes exactly the timeout | **IPv6 without an IPv6 route** | already handled by the helper; if you see it in your own code, force IPv4 — see Notebook 01 |
-| Kernel not found in Jupyter | kernelspec not registered | `uv run python -m ipykernel install --user --name python3` |
+| `Jupyter command 'jupyter-lab' not found` | `jupyterlab` not installed | `uv sync` — `workshop-setup` now checks for this |
 | Notebooks are unexecuted and you want the output | reading the `.ipynb` on disk | they are committed executed; run `uv run python scripts/build_notebooks.py --execute` |
+| A `login?next=...` page instead of the lab | Jupyter's token, in the terminal you launched from | paste the token from the original URL, or re-run the command |
 
 ### Getting the error messages you actually want
 
