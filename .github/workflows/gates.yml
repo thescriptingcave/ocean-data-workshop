@@ -103,6 +103,28 @@ jobs:
           fi
           echo "cache unchanged: the notebooks really are running offline"
 
+  beginners:
+    name: beginners tier
+    runs-on: ubuntu-latest
+    # Deliberately does NOT use `uv sync` on the root project, and does not install
+    # any of it. The beginners tier is meant to be standalone -- five packages from
+    # beginners/requirements.txt -- and the only way to keep that true is to keep
+    # testing it that way. If it ever starts depending on the database, the cache or
+    # the root pyproject, this job fails.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r beginners/requirements.txt
+      # nbclient/nbformat are what the *builder* needs to execute a notebook
+      # programmatically. A beginner never runs the builder -- they open the
+      # .ipynb files in jupyter lab -- so they are correctly absent from
+      # beginners/requirements.txt, and are installed here only to drive CI.
+      - run: pip install nbclient nbformat
+      - name: execute the beginners notebooks
+        run: python scripts/build_beginners.py --execute
+
   integration:
     name: integration, with the database
     runs-on: ubuntu-latest

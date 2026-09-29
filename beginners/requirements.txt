@@ -1,0 +1,13 @@
+# The whole beginners course. Five packages, no database, no Docker, no keys.
+#
+#   python -m venv .venv && source .venv/bin/activate
+#   pip install -r beginners/requirements.txt
+#   jupyter lab beginners/
+#
+# Everything here is free and public. Nothing below needs an account.
+
+requests      # fetching a URL             <- the course
+pandas        # getting it into a table
+duckdb        # the same thing in one line
+matplotlib    # plotting
+jupyterlab    # to read the notebooks

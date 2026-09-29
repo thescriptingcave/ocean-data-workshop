@@ -27,7 +27,8 @@ PORT_ARGS := $(if $(filter 5432,$(PORT)),,--port $(PORT))
 
 .DEFAULT_GOAL := all
 .PHONY: all setup lab lab-offline notebook notebooks test check check-notebooks check-independence \
-        lint unit fresh clean clean-cache help deps kernel prefetch db db-ocean shell
+        lint unit fresh clean clean-cache help deps kernel prefetch db db-ocean shell \
+        beginners
 
 ## all: set up, then open Jupyter Lab
 all: setup lab
@@ -55,6 +56,14 @@ lab: kernel
 ## each request prints a warning saying so -- the numbers are real, just not new.
 lab-offline: kernel
 	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) jupyter lab $(NB_DIR)/
+
+## beginners: rebuild and run the beginners tier (5 notebooks, no database)
+##
+## Separate from `make notebook` on purpose. The beginners tier assumes no API
+## experience and has no dependency on the database, the cache or the Makefile --
+## it is the thing to give someone who has never fetched a URL.
+beginners:
+	@$(UV) run --with duckdb python scripts/build_beginners.py --execute
 
 ## notebook: execute every notebook, saving output -- the supported way to run them
 notebook:

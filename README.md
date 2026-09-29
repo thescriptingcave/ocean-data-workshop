@@ -7,9 +7,20 @@ to interpret them, not to predict them.
 
 ## Start here
 
+**Pick the tier that matches you.** They share no code and no setup.
+
+| | if you have… | start |
+|---|---|---|
+| **Beginners** | never fetched a URL | [`beginners/README.md`](beginners/README.md) — 5 notebooks, 40 min, 5 packages |
+| **Workshop** | used `requests` before | [`notebooks/README.md`](notebooks/README.md) — 10 notebooks, a database, ~30 catalogued traps |
+
+The beginners tier is standalone: no database, no Docker, no `make`, no `.env`, no
+account, no API key. `pip install -r beginners/requirements.txt` and open Jupyter Lab.
+
+Also:
+
 **→ [`GETTING_STARTED.md`](GETTING_STARTED.md)** — from nothing to running, ~85 seconds
 **→ [`GLOSSARY.md`](GLOSSARY.md)** — every term used, defined
-**→ [`notebooks/README.md`](notebooks/README.md)** — the ten-notebook workshop
 
 **MIT licensed** for the code — see [`LICENSE`](LICENSE). The data it fetches is not
 covered; see the bottom of that file.
@@ -17,10 +28,30 @@ covered; see the bottom of that file.
 If you are contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md) — the notebooks are
 generated, do not edit the `.ipynb` files.
 
+## The beginners tier
+
+If you have never fetched a URL, start here and skip everything below.
+
+```bash
+pip install -r beginners/requirements.txt
+jupyter lab beginners/
+```
+
+Five notebooks, about 40 minutes, against three real ocean services that need no key.
+One notebook per response shape — comma-separated text, JSON, compressed text — with
+the same four techniques (`curl`, `requests`, `pandas`, `duckdb`) applied to each so
+the second and third are recognisable. Each one gets it working *first*, then shows
+what quietly went wrong.
+
+Deliberately nothing else: no database, no Docker, no `make`, no `.env`, no cache, no
+accounts. It does not import a single thing from the rest of this repository, and CI
+tests it that way so it stays true.
+
 ## The data retrieval workshop
 
 Ten notebooks on getting real ocean data out of public APIs — the parts that are
-documented badly, and the parts that are not documented at all.
+documented badly, and the parts that are not documented at all. Assumes you have
+fetched a URL before; if not, do the beginners tier first.
 
 ```bash
 make                            # setup, then open Jupyter Lab
@@ -129,6 +160,12 @@ GCS JSON API, which needs no CLI at all.
 ## Layout
 
 ```
+beginners/       the standalone tier — 5 notebooks, own requirements.txt
+  00_..ipynb     a URL is a thing you can fetch
+  01_..ipynb     comma-separated text
+  02_..ipynb     JSON
+  03_..ipynb     compressed text
+  04_..ipynb     you write them
 probes/          Phase -1 access probes
   _common.py     contract, cache, verdict format, IPv4-forcing HTTP session
   probe_NN_*.py  one per dataset, exposing fetch(tiny=True)
