@@ -169,6 +169,9 @@ will need to *know* you need it, because nothing tells you.
 import shutil
 import subprocess
 
+# Also defined earlier, so this cell runs on its own. People jump to cells.
+URL = S.sst_csv(point=True)
+
 if shutil.which("curl"):
     for label, flags in [("without -g", ["-s"]), ("with -g", ["-s", "-g"])]:
         r = subprocess.run(
@@ -251,6 +254,8 @@ as the URL.
         code('''
 # Show exactly what `requests` would put on the wire, for each of the two mistakes.
 # No network needed -- this is just string assembly, so it works offline too.
+import requests
+
 expr = "[(2019-09-01T00:00:00Z):(2019-09-30T00:00:00Z)][(36.6):(36.6)][(-122.2):(-122.2)]"
 
 def query_of(params):
@@ -314,6 +319,10 @@ row 1 (the units).
 """),
         code('''
 import io
+
+# Re-fetched rather than reusing `raw` from eight cells earlier: a variable defined
+# that far up breaks the moment someone runs this cell alone.
+raw = http.get(S.sst_csv(point=True))
 
 df = pd.read_csv(io.StringIO(raw.text), skiprows=[1])
 df["time"] = pd.to_datetime(df["time"].str.replace("Z", "", regex=False))
@@ -581,6 +590,10 @@ download?" is a real question worth asking before you trust any single value.
 
         code('''
 # Assert the response is what this notebook said it would be.
+# Built here as well, so the notebook's final cell can be run on its own.
+raw = http.get(S.sst_csv(point=True))
+df = pd.read_csv(io.StringIO(raw.text), skiprows=[1])
+
 _fetch.expect("response bytes", len(raw.content), 1324)
 _fetch.expect("rows", len(df), 30)
 _fetch.expect("columns", list(df.columns), ["time", "latitude", "longitude", "analysed_sst"])
@@ -2472,6 +2485,8 @@ def q(sql, **params):
         warnings.simplefilter("ignore", UserWarning)
         return pd.read_sql_query(sql, conn, params=params)
 
+from ocean_sim.dsn import dsn
+
 conn = psycopg.connect(dsn())
 
 for t in ("ocean_profile_daily", "acoustic_tol_hourly", "detection_hourly", "wind_daily"):
@@ -2496,6 +2511,8 @@ SELECT avg(a), avg(b) FROM t     --  two columns, both called "avg"
 `df["avg"]` silently gives you the first. Every aggregate in this notebook is aliased.
 """),
         code('''
+from ocean_sim.dsn import dsn
+
 conn = psycopg.connect(dsn())
 demo = q("SELECT avg(wind_speed_mean_ms) AS mean_speed, avg(wind_gust_max_ms) AS mean_gust FROM wind_daily")
 print("  aliased:", list(demo.columns))
@@ -2577,6 +2594,8 @@ print(f"  {aligned.shape[1]} frequency bands")
 print()
 
 # And the same thing in SQL, against the loaded database, so both routes agree.
+from ocean_sim.dsn import dsn
+
 conn = psycopg.connect(dsn())
 joined = q("""
     SELECT a.observed_at::date AS day,
