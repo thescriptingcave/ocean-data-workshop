@@ -22,6 +22,8 @@ __pycache__/
 
 # notebooks
 .ipynb_checkpoints/
+# prefetched API responses -- real data, but regenerable, and large
+notebooks/.cache/
 
 # macOS
 .DS_Store

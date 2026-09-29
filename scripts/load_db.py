@@ -29,11 +29,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from ocean_sim.config import OCEAN_BOX
 from ocean_sim.data import glorys, ncei, ndbc
+from ocean_sim.dsn import dsn
 
 ROOT = Path(__file__).resolve().parent.parent
-DSN = __import__("os").environ.get(
-    "OCEAN_SIM_DSN", "postgresql://postgres:ocean@localhost:5432/ocean_sim"
-)
+DSN = dsn()
 WIND_STATION = "46092"
 ACOUSTIC_SITE = "mb01"
 ACOUSTIC_DEPLOYMENTS = ["01", "02", "03", "04", "05", "06", "07"]
@@ -179,7 +178,7 @@ def _band_col(freq: float) -> str:
     while the schema column is ``band_32hz``. Note ``round`` is banker's rounding, which
     is fine here -- the only .5 centre in the series is 31.5, and 32 is even.
     """
-    return f"band_{int(round(float(freq)))}hz"
+    return f"band_{round(float(freq))}hz"
 
 
 def load_acoustic() -> int:
@@ -284,7 +283,7 @@ def main() -> int:
                 "'acoustic_tol_hourly','detection_hourly','source') ORDER BY relname"
             )
             print("\n  table                 estimated rows")
-            for name, est in cur.fetchall():
+            for name, _est in cur.fetchall():
                 cur.execute(f"SELECT count(*) FROM {name}")
                 print(f"  {name:22} {cur.fetchone()[0]:>9,}")
     print(f"\nwindow: {WINDOW_START} .. {WINDOW_END}")

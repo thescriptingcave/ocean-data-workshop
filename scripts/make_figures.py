@@ -31,6 +31,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from ocean_sim.config import OCEAN_SITE
+from ocean_sim.dsn import dsn
 
 ROOT = Path(__file__).resolve().parent.parent
 FIGDIR = ROOT / "figures"
@@ -38,9 +39,7 @@ FIGDIR.mkdir(exist_ok=True)
 
 import psycopg  # noqa: E402
 
-DSN = __import__("os").environ.get(
-    "OCEAN_SIM_DSN", "postgresql://postgres:ocean@localhost:5432/ocean_sim"
-)
+DSN = dsn()
 
 # The 30 ISO third-octave band centres, ascending.
 BANDS = [25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800,

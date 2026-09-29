@@ -33,9 +33,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import psycopg
 
-DSN = __import__("os").environ.get(
-    "OCEAN_SIM_DSN", "postgresql://postgres:ocean@localhost:5432/ocean_sim"
-)
+from ocean_sim.dsn import dsn
+
+DSN = dsn()
 
 
 def q(sql: str, **params) -> pd.DataFrame:

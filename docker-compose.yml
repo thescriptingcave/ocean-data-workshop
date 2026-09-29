@@ -1,11 +1,25 @@
+# Workshop database: PostgreSQL 17 + TimescaleDB.
+#
+# Pinned, deliberately. The tag was `latest-pg17`, which means every attendee who runs
+# `docker compose up` on a different day can get a different image. For a workshop where
+# people set this up across several weeks, an unpinned tag means the thing you tested is
+# not the thing they ran. This resolves to exactly the image that was already in use
+# (TimescaleDB 2.30.1, PostgreSQL 17.11), so pinning changes no behaviour.
+#
+# Port is overridable because a hardcoded 5432 fails with `port is already allocated`
+# for anyone already running a local PostgreSQL -- which is most people who write Python.
+# Override with OCN_SIM_PORT, e.g.  `OCEAN_SIM_PORT=5433 docker compose up -d`.
+# Every script that connects reads the same variable, via src/ocean_sim/dsn.py.
+name: ocean-sim
+
 services:
   db:
-    image: timescale/timescaledb:latest-pg17
+    image: timescale/timescaledb:2.30.1-pg17
     container_name: ocean-sim-db
     ports:
-      - "5432:5432"
+      - "${OCEAN_SIM_PORT:-5432}:5432"
     environment:
-      POSTGRES_PASSWORD: ocean      # local dev only, never a real secret
+      POSTGRES_PASSWORD: ocean      # local workshop only, never a real secret
       POSTGRES_DB: ocean_sim
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ocean_sim"]

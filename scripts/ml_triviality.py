@@ -1,3 +1,6 @@
+# ruff: noqa: N806  -- X, y, Xv, yv are the standard sklearn/pandas names for the
+# design matrix and target. Renaming them to satisfy a style rule would make this
+# file less recognisable as the ML code it is.
 """Is the MB01 detection task real, or circular?
 
 The open question from the plan: NOAA's labels are *algorithm output* -- vessel events from
@@ -156,7 +159,7 @@ def main() -> int:
             r = np.corrcoef(X[f], y)[0, 1]
             best.append((abs(r), r, f))
         best.sort(reverse=True)
-        for ar, r, f in best[:5]:
+        for _ar, r, f in best[:5]:
             thr = np.median(X[f])
             acc = max(
                 float(((X[f] > thr) == (y == 1)).mean()),
