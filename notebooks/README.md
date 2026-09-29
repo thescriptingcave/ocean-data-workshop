@@ -1,6 +1,6 @@
 # Workshop Advanced — data retrieval
 
-Ten notebooks on getting real ocean data out of public APIs — the parts that are
+Eleven notebooks on getting real ocean data out of public APIs — the parts that are
 documented badly, and the parts that are not documented at all.
 
 Built around real data from **Monterey Bay, California**: sea surface temperature from
@@ -58,12 +58,18 @@ that ends data workshops.
 | 01 | **The request, three ways** | HTTP fundamentals | ERDDAP |
 | 02 | Query a grid, dimensionally | REST griddap | ERDDAP SST |
 | 03 | List a bucket, fetch one object | cloud object storage | NOAA NCEI GCS |
-| 04 | Browse a tree, read netCDF | browsable netCDF | Argo GDAC |
-| 05 | Authenticate, then query | credentialed API | Copernicus Marine |
-| 06 | Parse fixed-format text | delimited text | NDBC 46092 |
-| 07 | When a library beats a request | domain library | `gsw` |
-| 08 | **Capstone: join three sources** | all of the above | + TimescaleDB |
-| 09 | **The trap table** | reference | — |
+| 04 | **Who is allowed to read this?** | access policy | S3 + BigQuery — **live only** |
+| 05 | Browse a tree, read netCDF | browsable netCDF | Argo GDAC |
+| 06 | Authenticate, then query | credentialed API | Copernicus Marine |
+| 07 | Parse fixed-format text | delimited text | NDBC 46092 |
+| 08 | When a library beats a request | domain library | `gsw` |
+| 09 | **Capstone: join three sources** | all of the above | + TimescaleDB |
+| 10 | **The trap table** | reference | — |
+
+**Notebook 04 is the exception to the offline rule below.** It reads the *current*
+access policy of S3 and BigQuery, so it deliberately bypasses the cache — a cached
+`403` would outlive the policy that produced it — and it needs a live network. CI runs
+it in its own job for that reason.
 
 Organised by **access pattern**, not by dataset: the patterns transfer to sources none
 of us have heard of, and the datasets do not.
@@ -88,7 +94,7 @@ that is broken, not just the first thing.
 
 ## The result
 
-Notebook 08 joins wind to underwater noise across 30 frequency bands, over 313 days:
+Notebook 09 joins wind to underwater noise across 30 frequency bands, over 313 days:
 
 | | mean \|r\| | bands |
 |---|---|---|
@@ -105,7 +111,7 @@ is overconfident by roughly that factor.
 
 ## The trap table
 
-Notebook 09 lists **35 traps** found while building this material, **34 of them reproduced against
+Notebook 10 lists **39 traps** found while building this material, **39 of them reproduced against
 live services**, and none of them documented anywhere. A sample:
 
 | trap | symptom |

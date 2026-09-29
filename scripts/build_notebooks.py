@@ -35,12 +35,13 @@ NOTEBOOK_ORDER = [
     "01_request_three_ways",
     "02_erddap_griddap",
     "03_gcs_object_storage",
-    "04_argo_gdac_netcdf",
-    "05_copernicus_credentialed",
-    "06_ndbc_fixed_format",
-    "07_gsw_domain_library",
-    "08_capstone_join",
-    "09_trap_table",
+    "04_cloud_access_policy",
+    "05_argo_gdac_netcdf",
+    "06_copernicus_credentialed",
+    "07_ndbc_fixed_format",
+    "08_gsw_domain_library",
+    "09_capstone_join",
+    "10_trap_table",
 ]
 
 

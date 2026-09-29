@@ -122,7 +122,7 @@ symptom.
 
 **Graceful degradation**
 Falling back to something workable instead of raising. Every request in the workshop falls
-back to a cached response and says so; Notebook 05 detects missing credentials and keeps
+back to a cached response and says so; Notebook 06 detects missing credentials and keeps
 teaching. Worst case is a stale answer with a warning, not a traceback.
 
 ---

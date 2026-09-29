@@ -87,9 +87,9 @@ jobs:
         run: |
           uv run python scripts/build_notebooks.py --execute \
             --only 00_orientation 01_request_three_ways 02_erddap_griddap \
-                   03_gcs_object_storage 04_argo_gdac_netcdf \
-                   05_copernicus_credentialed 06_ndbc_fixed_format \
-                   07_gsw_domain_library 09_trap_table
+                   03_gcs_object_storage 05_argo_gdac_netcdf \
+                   06_copernicus_credentialed 07_ndbc_fixed_format \
+                   08_gsw_domain_library 10_trap_table
 
       - name: the cache was not modified by running them
         # A notebook that refetches changes the cache, which means the offline
@@ -124,6 +124,26 @@ jobs:
       - run: pip install nbclient nbformat
       - name: execute the Workshop Intro notebooks
         run: python scripts/build_beginners.py --execute
+
+  live:
+    name: notebook 04, live
+    runs-on: ubuntu-latest
+    # The one Advanced notebook that cannot run from the cache, because its subject is
+    # what three services say *right now* about who may read them. Two of the three
+    # probes it makes return 403 and 404, and _fetch raises for status before it writes
+    # to the cache -- so there is nothing to serve offline. That is the correct
+    # behaviour: a cached 403 would outlive the policy that produced it.
+    #
+    # So this job has the network, deliberately, and that is the whole design.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run python -m ipykernel install --user --name python3
+      - name: the access-policy notebook
+        run: uv run python scripts/build_notebooks.py --execute --only 04_cloud_access_policy
 
   integration:
     name: integration, with the database
@@ -174,4 +194,4 @@ jobs:
         run: uv run python scripts/load_db.py
 
       - name: the capstone, which needs the database
-        run: uv run python scripts/build_notebooks.py --execute --only 08_capstone_join
+        run: uv run python scripts/build_notebooks.py --execute --only 09_capstone_join

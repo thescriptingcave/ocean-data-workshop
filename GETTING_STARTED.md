@@ -17,15 +17,15 @@ says so.
 | | requirement | notes |
 |---|---|---|
 | **Python** | 3.11 or newer | you do **not** need to install it — see below |
-| **Docker** | Docker Desktop, or `docker-ce` + the compose plugin | only for Notebook 08 |
+| **Docker** | Docker Desktop, or `docker-ce` + the compose plugin | only for Notebook 09 |
 | **Disk** | ~200 MB free | Python env, ~15 MB of data, 6 MB of cache |
 | **Time** | 5 min to set up, 2h40 of workshop | compute time is 27 s; the rest is discussion |
 
-A free **Copernicus Marine** account is optional. It unlocks Notebook 05 and the ocean
+A free **Copernicus Marine** account is optional. It unlocks Notebook 06 and the ocean
 profile (temperature, salinity, currents).
 
 **Verified working without one.** On a machine with no account: the three anonymous
-sources load, all ten notebooks run, and Notebook 08's result is unaffected — it joins
+sources load, all ten notebooks run, and Notebook 09's result is unaffected — it joins
 wind to acoustics, and neither needs an account. Nothing else needs a login.
 
 ### Supplying the credentials
@@ -235,7 +235,7 @@ been rehearsed end to end yet — treat it as untested.
 | `container name is already in use` | another checkout of this repo | `OCEAN_DATA_WORKSHOP_PROJECT=$(basename $PWD) PORT=5433 make` |
 | `Docker is installed but the daemon is not responding` | Docker Desktop still starting | wait for it, then re-run |
 | `No cached copy and no working network` | no cache archive and the network failed | the archive ships with the repo; if you deleted it, re-run `uv run python scripts/prefetch.py` |
-| `ocean_profile_daily 0 <- empty` | no Copernicus account | expected. Everything else loaded; Notebook 08 still works |
+| `ocean_profile_daily 0 <- empty` | no Copernicus account | expected. Everything else loaded; Notebook 09 still works |
 | `No module named 'ocean_data_workshop...'` | project not installed | `uv sync` |
 | Every call takes exactly the timeout | **IPv6 without an IPv6 route** | already handled by the helper; if you see it in your own code, force IPv4 — see Notebook 01 |
 | `Jupyter command 'jupyter-lab' not found` | `jupyterlab` not installed | `uv sync` — `workshop-setup` now checks for this |
@@ -269,7 +269,7 @@ reliably.
 ```bash
 uv run python scripts/build_notebooks.py            # render, do not run
 uv run python scripts/build_notebooks.py --execute  # render and run, saving output
-uv run python scripts/build_notebooks.py --execute --only 08_capstone_join
+uv run python scripts/build_notebooks.py --execute --only 09_capstone_join
 ```
 
 One notebook failing does not stop the others — during a build you want to know

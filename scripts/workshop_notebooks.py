@@ -9,12 +9,16 @@ transfer to sources none of us have heard of and the datasets do not:
     01  the request, three ways        curl -> requests -> xarray
     02  REST griddap                   ERDDAP
     03  cloud object storage           GCS / NCEI
-    04  browsable tree + netCDF        Argo GDAC
-    05  credentialed API               Copernicus Marine
-    06  fixed-format text              NDBC
-    07  when a library wins            gsw
-    08  capstone: join three sources   + TimescaleDB
-    09  the trap table                 reference
+    04  access policy                  S3 + BigQuery, live only
+    05  browsable tree + netCDF        Argo GDAC
+    06  credentialed API               Copernicus Marine
+    07  fixed-format text              NDBC
+    08  when a library wins            gsw
+    09  capstone: join three sources   + TimescaleDB
+    10  the trap table                 reference
+
+Notebook 04 is the one notebook that bypasses the cache on purpose, and CI runs it in a
+job with the network for that reason -- see its own section, and the `live` CI job.
 
 Every number quoted in a notebook was measured, not estimated. Where an approach does
 not work, the notebook says so and says what the server actually replied.
@@ -543,7 +547,7 @@ print("  One method, 'send'. Everything else is stock requests.")
 | 6 | IPv6 with no route | every call takes exactly the timeout | force IPv4 (helper does it) |
 | 7 | no timeout on `requests` | hangs forever on a dead host | always pass `timeout=` |
 
-There are about 28 of these across the whole workshop. Notebook 09 is the full list.
+There are about 28 of these across the whole workshop. Notebook 10 is the full list.
 """),
 
         md("""
@@ -1129,9 +1133,290 @@ print("  a decoding problem, not a quiet ocean.")
 
 
 # ===========================================================================
-# 04 -- Browsable tree + netCDF
+# 04 -- Access policy
 # ===========================================================================
 def nb_04() -> object:
+    b = build(
+        md("""
+# 04 — Who is allowed to read this?
+
+**Access pattern: authorisation, across clouds.** Notebook 03 showed that a public
+bucket is just HTTPS. That is true, and it is the whole of it — for *some* buckets.
+
+This one asks the question 03 skipped: **how do you know whether you are allowed?**
+The answer is a status code, and the codes are not interchangeable.
+
+Nothing here needs an account. Every request below is made anonymously, with no
+credentials of any kind, and the point is watching what each service says.
+"""),
+        *preamble(),
+
+        md("""
+## 0. This notebook does not use the cache
+
+Everything else in this workshop goes through `_fetch.session()`, which caches every
+response to disk. This notebook deliberately uses **plain `requests`**, and the reason
+is the subject matter.
+
+A cache stores the answer you got. For this notebook the answer is *"what does this
+service's access policy say right now"* — and access policy changes. A bucket that was
+public last month can be made Requester Pays tomorrow, and a cached `403` would then be
+sitting in your cache folder asserting, confidently and wrongly, that you may not read
+it.
+
+**A cache is only honest for facts that do not change.** Everything else you fetch
+should be treated as a measurement with a timestamp, not as a fact. That is the one
+piece of judgement this workshop cannot hand you in a function call.
+
+Which also means this notebook needs a live network, and CI runs it in a job that has
+one.
+"""),
+        code('''
+# Plain requests. No session, no cache, no _fetch.
+import xml.etree.ElementTree as ET
+
+import requests
+
+S3_NS = "{http://s3.amazonaws.com/doc/2006-03-01/}"
+# Note the asymmetry: a successful listing is <ListBucketResult xmlns="..."> with
+# namespaced children, but a failure is a bare <Error> whose children are unprefixed.
+# So findtext(f"{S3_NS}Code") returns None on *every* error -- a silent failure, and the
+# reason this cell prints the code and the message side by side rather than trusting one.
+
+
+def s3_listing(bucket, max_keys=5):
+    """List a bucket anonymously. Returns the raw Response, deliberately unparsed."""
+    return requests.get(
+        f"https://{bucket}.s3.amazonaws.com/",
+        params={"list-type": "2", "max-keys": max_keys},
+        timeout=30,
+    )
+
+
+def error_code(resp):
+    """Pull <Code> out of an S3 error body, or None if this was a success."""
+    if resp.status_code == 200:
+        return None
+    try:
+        return ET.fromstring(resp.content).findtext("Code")   # no namespace
+    except ET.ParseError:
+        return None
+
+
+def error_message(resp):
+    """Pull <Message> out of an S3 error body."""
+    try:
+        return (ET.fromstring(resp.content).findtext("Message") or "").strip()
+    except ET.ParseError:
+        return ""
+'''),
+        md("""
+## 1. Four buckets, one identical request
+
+Same method, same URL shape, same absence of credentials. Four different answers.
+
+`noaa-goes16` is a real NOAA bucket of GOES-16 satellite imagery, and it is open.
+`landsat-pds` and `usgs-landsat` are both real, well-known USGS Landsat buckets, and
+neither will serve you anonymously. `noaa-pds` does not exist at all — I guessed it.
+"""),
+        code('''
+BUCKETS = [
+    ("noaa-goes16",  "a real, open NOAA bucket"),
+    ("landsat-pds",  "real, and well known"),
+    ("usgs-landsat", "also real, also well known"),
+    ("noaa-pds",     "a name I invented"),
+]
+
+print(f"  {'bucket':<14}{'status':<8}{'S3 code':<15}message")
+print("  " + "-" * 118)
+for bucket, note in BUCKETS:
+    r = s3_listing(bucket)
+    msg = error_message(r) or "(no error -- this was a success)"
+    # Not truncated. The whole point of the fourth row is that this sentence names the
+    # policy, and a message cut off at "Requester" stops doing that job.
+    print(f"  {bucket:<14}{r.status_code:<8}{str(error_code(r)):<15}{msg}")
+    print(f"  {'':<14}{'':<8}{'':<15}({note})")
+'''),
+        md("""
+### Read those as four different problems
+
+`200` — you may read this bucket, anonymously, with nothing to sign and nothing to pay.
+
+`404` `NoSuchBucket` — the bucket does not exist and never did. **No credential will make
+it appear.** Your request was fine; your *name* was wrong.
+
+`403` `AccessDenied` — the bucket is real and you are not on its list. Now, and only
+now, credentials are the answer.
+
+So `403` and `404` are not the same failure, even though `assert resp.ok` collapses them
+into one. That is an afternoon lost: you go looking for an API key to fix a typo.
+**Print the error code before you go looking for a key.** Same species of bug as
+notebook 07’s `99`-versus-`999` sentinels — a failure whose cause is not the one you would
+guess from the symptom.
+
+### The part that is genuinely not obvious
+
+Look at the two `403` rows again. **They do not say the same thing.**
+
+- `usgs-landsat` names the problem outright: *"Anonymous users cannot invoke requests
+  against Requester Pays buckets. Please authenticate."* That message gives you the
+  policy and the fix.
+- `landsat-pds` says only *"Access Denied"*. Which is true, and close to useless — it
+  does not distinguish "you are not permitted" from "this costs money", and those have
+  completely different answers.
+
+So read the error body, but **do not expect it to name the policy.** Where it does not,
+the registry entry is the source. That is trap-table rule 4 in one line: the thing the
+service does not tell you is the thing you have to go and look up.
+"""),
+        md("""
+## 2. Requester Pays: public to look at, not free to fetch
+
+`landsat-pds` is not secret. You can read its name in a registry, and anybody can see
+that the data is open. What is not open is the **bandwidth**.
+
+The bucket's owner pays for egress. A large bucket of multi-gigabyte scenes would be
+ruinous to serve for free, so AWS splits the difference: the bucket is visible to
+everyone and billable to whoever requests the bytes. Hence the name.
+
+So the honest statement about a Requester Pays bucket is not "it is locked" but
+**"it is public, and using it costs money"** — which is a different thing, and much
+easier to get wrong, because nothing about the URL tells you which you are looking at.
+"""),
+        code('''
+# Both of these are real, well-known public datasets. One you may fetch anonymously;
+# the other you may not. Nothing in the bucket name reveals which.
+CASES = [
+    ("noaa-goes16",  "GOES-16 satellite imagery", "free to fetch anonymously", ""),
+    ("landsat-pds",  "Landsat scenes",            "Requester Pays",           "per the registry"),
+    ("usgs-landsat", "Landsat scenes, other copy", "Requester Pays",          "the body says so"),
+    ("commoncrawl",  "web crawl archives",        "Requester Pays",           "per the registry"),
+]
+print(f"  {'bucket':<14}{'status':<8}{'what it is':<30}{'verdict':<18}how we know")
+print("  " + "-" * 100)
+for bucket, what, verdict, how in CASES:
+    r = s3_listing(bucket, max_keys=1)
+    print(f"  {bucket:<14}{r.status_code:<8}{what:<30}{verdict:<18}{how}")
+print()
+print("  All four are public data. Only one is free to read.")
+print("  The URL never told you which, and neither did two of the error bodies.")
+'''),
+        md("""
+### Free to access is not free to use
+
+The distinction that catches people, and it is worth being precise about:
+
+| | the bytes | running a query over them |
+|---|---|---|
+| public S3 bucket | free | **not free** — Athena and Redshift Spectrum bill per query |
+| BigQuery public dataset | free | metered — 1 TiB/month free, then not |
+| public GCS bucket (notebook 03) | free | **not free** — BigQuery bills the scan |
+
+The data being open and the *computing* being free are independent facts, and the
+second is the one that produces an invoice. An open bucket queried through Athena costs
+money; the same bytes fetched with `requests` cost nothing. Identical data, opposite
+bills, decided entirely by which tool you reached for.
+"""),
+        md("""
+## 3. The counter-example: BigQuery
+
+Same phrase — "free public datasets" — and the opposite access model.
+
+This is worth seeing precisely because the marketing language is identical to S3's.
+BigQuery genuinely does host large public datasets, queryable with SQL, and the first
+terabyte of scanning per month is free. It is also true that **you cannot make the
+request at all** without authenticating.
+"""),
+        code('''
+BQ = ("https://bigquery.googleapis.com/bigquery/v2/projects/"
+      "bigquery-public-data/queries")
+
+# The cheapest possible query, against the public project, with no credentials.
+r = requests.post(
+    BQ,
+    json={"query": "SELECT 1 AS ok", "useLegacySql": False},
+    timeout=30,
+)
+print(f"  POST {BQ}")
+print(f"  -> HTTP {r.status_code}")
+body = r.json()
+print()
+print("  ", body["error"]["message"])
+'''),
+        code('''
+# Even *listing* the public datasets needs a principal.
+r = requests.get(
+    "https://bigquery.googleapis.com/bigquery/v2/projects/bigquery-public-data/datasets",
+    timeout=30,
+)
+print(f"  listing datasets anonymously -> HTTP {r.status_code}")
+print("  reason:", r.json()["error"]["errors"][0]["reason"])
+'''),
+        md("""
+Read that against the S3 results. The data is public, the price is zero-or-free, and
+the API still refuses to answer — because **authentication and authorisation are
+different questions**, and this service requires an answer to the first one before it
+will even consider the second.
+
+| | anonymous | what you need |
+|---|---|---|
+| S3, public bucket | **works** | nothing |
+| S3, Requester Pays | 403 | an account, and you pay egress |
+| BigQuery, public dataset | **401** | a Google account, a project, and a token |
+
+### The advice is out of date, which is why people disagree
+
+The honest answer here has *changed*, and if your sources disagree, that is why:
+
+- **For years the answer was** "you need a billing account attached to your project."
+  That was true, and it is the advice still circulating.
+- **Now there is a sandbox.** From Google's own documentation: the BigQuery sandbox
+  "lets you experience BigQuery without providing a credit card or creating a billing
+  account for your project." Create a project, query the public datasets, pay nothing.
+- **Or** with billing enabled, the first **1 TiB of query data processed per month is
+  free**.
+
+So "it's totally free" and "you need a credit card" were both correct answers to this
+question, at different times. A field moves, and confident second-hand answers are the
+first casualty.
+
+Which is the transferable lesson, and the reason this notebook ends where it does:
+**when a service's answer depends on its commercial policy, the documentation is the
+source and your memory is not.** Fetch the docs, and check the date on them.
+"""),
+        md("""
+## 4. What to do with this
+
+Not memorise a list of codes. Learn the order of operations:
+
+1. **Read the status code.** `200`, `403`, `404`, `401` are four different problems.
+2. **Read the body when it is an error.** The body names the cause, and the cause
+   decides the fix. A 404 will never be fixed with a key.
+3. **Distinguish "you are not allowed" from "I do not know who you are".** 403 and 401
+   are not interchangeable: 401 means *authenticate*, 403 means *then ask for more*.
+4. **Ask whether it is free before assuming it is.** And if it is free to read, check
+   separately whether it is free to *compute over*.
+5. **Check the date on the documentation** when the answer involves pricing.
+
+A quick reference, and the only part worth memorising:
+
+| you sent | you got | it means | do this |
+|---|---|---|---|
+| a request, no credentials | **200** | allowed | proceed |
+| a request, no credentials | **401** | who are you? | authenticate |
+| a request, no credentials | **403** | known, still not allowed | read the body: policy, or requester-pays? |
+| a request, no credentials | **404** | no such thing | fix the name — **not** the key |
+| a request, credentials | **429** | too many requests | slow down and retry with backoff |
+"""),
+        title="04 Who is allowed to read this?",
+    )
+    return b
+
+
+# ===========================================================================
+# 05 -- Browsable tree + netCDF
+# ===========================================================================
+def nb_05() -> object:
     b = build(
         md("""
 # 04 — Browse a tree, read netCDF
@@ -1438,7 +1723,7 @@ print("  200 C, you have a scale, a fill-value or a QC problem.")
 # ===========================================================================
 # 06 -- Fixed-format text
 # ===========================================================================
-def nb_06() -> object:
+def nb_07() -> object:
     b = build(
         md("""
 # 06 — Parse fixed-format text
@@ -1700,7 +1985,7 @@ print("  mean is not doing anything. They should differ.")
 # ===========================================================================
 # 07 -- When a library beats a request
 # ===========================================================================
-def nb_07() -> object:
+def nb_08() -> object:
     b = build(
         md("""
 # 07 — When a library beats a request
@@ -1726,13 +2011,13 @@ silent:
 | `p` | pressure | dbar |
 
 We will compute sound speed and its pressure derivative for a real profile — the Argo
-one from Notebook 04.
+one from Notebook 05.
 """),
         code('''
 import gsw
 import xarray as xr
 
-# Fetched here rather than assumed from Notebook 04, so this notebook runs on its
+# Fetched here rather than assumed from Notebook 05, so this notebook runs on its
 # own. Every notebook in the workshop is independently runnable; people skip around.
 argo_path = Path.cwd() / "_argo_1900063_prof.nc"
 if not argo_path.exists():
@@ -1902,7 +2187,7 @@ error.
 ### And when a library is *not* the answer
 
 `argopy` would have been the obvious choice for Argo, and it is currently broken against
-`erddapy` 3.x (Notebook 04). A library that requires you to pin `erddapy<3` and
+`erddapy` 3.x (Notebook 05). A library that requires you to pin `erddapy<3` and
 downgrade `xarray` to work, in order to read plain netCDF over HTTPS, is not saving you
 time. Check the maintenance cost, not just the import.
 """),
@@ -1929,6 +2214,22 @@ print("  instantly, instead of three notebooks later.")
 # ===========================================================================
 TRAPS: list[tuple] = [
     # (where, what breaks, symptom, fix, verified)
+    ("04 access policy", "403 and 404 both look like 'not allowed'",
+     "you go looking for an API key to fix a bucket name that does not exist; S3 "
+     "answers NoSuchBucket (404) for a wrong name and AccessDenied (403) for a real "
+     "one, and assert resp.ok collapses the difference",
+     "read the error body before authenticating: 404 needs a new name, 403 needs a key",
+     "live"),
+    ("04 access policy", "a public-looking bucket is not free to fetch",
+     "landsat-pds reads as open, then answers 403 'Anonymous users cannot invoke "
+     "requests against Requester Pays buckets. Please authenticate.' -- the owner pays "
+     "egress, so the bytes are billable to whoever pulls them",
+     "requests pays nothing; Athena or Spectrum over an open bucket does", "live"),
+    ("04 access policy", "free public data still refuses an anonymous request",
+     "POST to the public-data project returns 401 'Request is missing required "
+     "authentication credential' before the query is even looked at",
+     "a Google account and project; the sandbox needs no credit card, and the first "
+     "1 TiB of query processing per month is free", "live"),
     ("01/02 ERDDAP", "CSV has a names row AND a units row",
      "first row of strings; off-by-one on every row after",
      "pd.read_csv(..., skiprows=[1])", "live"),
@@ -1956,7 +2257,7 @@ TRAPS: list[tuple] = [
     ("02 ERDDAP", "large CSV responses are paged",
      "page 2 without page 1 returns empty with HTTP 200",
      "request pages in order", "documented"),
-    ("01-07 any", "AAAA records but no IPv6 route",
+    ("01-08 any", "AAAA records but no IPv6 route",
      "requests ~100x slower than curl; every call takes exactly the timeout",
      "force AF_INET (the workshop helper does this)", "live"),
     ("03 GCS", "the data/ level is mandatory when FETCHING",
@@ -1974,73 +2275,73 @@ TRAPS: list[tuple] = [
     ("03 GCS", "same recording at four resolutions",
      "psd_1h is ~456 MB against tol_1h at ~0.7 MB",
      "list first, read the size, then download", "live"),
-    ("04 Argo", "N_PARAM is in ds.sizes but unused by TEMP/PSAL/PRES",
+    ("05 Argo", "N_PARAM is in ds.sizes but unused by TEMP/PSAL/PRES",
      "ValueError on isel, or a silently wrong selection if you ignore it",
      "check .shape before indexing", "live"),
-    ("04 Argo", "QC flags are bytes in _prof.nc, int8 in per-cycle files",
+    ("05 Argo", "QC flags are bytes in _prof.nc, int8 in per-cycle files",
      "(qc == 1) is silently all-False",
      "decode to int first; count the codes, do not use .all()", "live"),
-    ("04 Argo", "no index and no search API over 4,261 floats",
+    ("05 Argo", "no index and no search API over 4,261 floats",
      "/index/, /dac/index/, _prof_index.txt all 404",
      "plan for screening, or use a source that has an index", "live"),
-    ("04 Argo", "no small file holds a float's position",
+    ("05 Argo", "no small file holds a float's position",
      "_meta.nc (35 KB) and _tech.nc (2.8 MB) both lack LATITUDE",
      "position is in _prof.nc; screening costs 689 KB per candidate", "live"),
-    ("04 Argo", "argopy is broken against erddapy 3.x",
+    ("05 Argo", "argopy is broken against erddapy 3.x",
      "imports the removed _quote_string_constraints",
      "fetch GDAC netCDF directly; do not downgrade xarray", "live"),
-    ("06 NDBC", "line 0 is names, line 1 is units, data starts at line 2",
+    ("07 NDBC", "line 0 is names, line 1 is units, data starts at line 2",
      "columns named #yr, mo, dy; KeyError much later",
      "parse lines[0], slice from lines[2]", "live"),
-    ("06 NDBC", "resolution is not uniform within a year file",
+    ("07 NDBC", "resolution is not uniform within a year file",
      "7,835 rows for 2019, not 8,760; file starts 5 January",
      "resample explicitly; never assume hourly", "live"),
-    ("06 NDBC", "sentinels are per column, and 99 is a valid bearing",
+    ("07 NDBC", "sentinels are per column, and 99 is a valid bearing",
      "a blanket >= 99 filter deletes real easterly winds",
      "mask per column: 99 generally, 999 for WDIR/MWD", "live"),
-    ("06 NDBC", "RangeIndex Series into DataFrame(index=DatetimeIndex)",
+    ("07 NDBC", "RangeIndex Series into DataFrame(index=DatetimeIndex)",
      "aligns on index; every column silently NaN",
      "pass .to_numpy() so values are positional", "live"),
-    ("06 NDBC", "wind direction is FROM, and bearings wrap",
+    ("07 NDBC", "wind direction is FROM, and bearings wrap",
      "mean(350, 10) = 180, the exact opposite of 0; 79.6 deg error over 2019",
      "average the u/v vectors, then atan2", "live"),
-    ("07 gsw", "Conservative Temperature is degrees C, not Kelvin",
+    ("08 gsw", "Conservative Temperature is degrees C, not Kelvin",
      "returns nan with only a RuntimeWarning; propagates silently",
      "pass degC, or convert with gsw.CT_from_t", "live"),
-    ("07 gsw", "SA is not SP",
+    ("08 gsw", "SA is not SP",
      "SA_from_SP needs pressure AND position; ~0.17 g/kg apart",
      "use gsw.SA_from_SP(sp, p, lon, lat)", "live"),
-    ("07 gsw", "dc/dp is ~17 m/s per 1000 dbar",
+    ("08 gsw", "dc/dp is ~17 m/s per 1000 dbar",
      "a per-dbar reading of a per-1000 quantity is 100x wrong",
      "state the units of whatever you are comparing against", "live"),
-    ("05 Copernicus", "describe with no filter returns a 170 MB catalogue",
+    ("06 Copernicus", "describe with no filter returns a 170 MB catalogue",
      "multi-minute hang on a 'describe' call",
      "always pass --dataset-id and a filter", "live"),
-    ("05 Copernicus", "the flag is --end-datetime",
+    ("06 Copernicus", "the flag is --end-datetime",
      "not --stop-datetime, which is rejected",
      "check --help; the CLI is not consistent across tools", "live"),
-    ("05 Copernicus", "advertised variable count is reported as 0",
+    ("06 Copernicus", "advertised variable count is reported as 0",
      "a correct dataset that looks empty",
      "do not trust the summary; request variables explicitly", "live"),
-    ("05 Copernicus", "the human Product ID and the CLI dataset id differ",
+    ("06 Copernicus", "the human Product ID and the CLI dataset id differ",
      "'Dataset not found' for GLOBAL_MULTIYEAR_PHY_001_030, which is live",
      "the CLI wants the CMEMS product code cmems_mod_glo_phy_my_0.083deg_P1D-m", "live"),
-    ("05 Copernicus", "the error tells you to check the dataset id",
+    ("06 Copernicus", "the error tells you to check the dataset id",
      "the id looks authoritative, so you start editing a correct one",
      "diff the failing argv against a working one before theorising", "live"),
-    ("05 Copernicus", "login env vars are COPERNICUSMARINE_SERVICE_USERNAME/PASSWORD",
+    ("06 Copernicus", "login env vars are COPERNICUSMARINE_SERVICE_USERNAME/PASSWORD",
      "COPERNICUS_USERNAME / COPERNICUS_PASSWORD are silently ignored",
      "read `copernicusmarine login --help` for the real names", "live"),
-    ("08 SQL", "Postgres names every avg() result 'avg'",
+    ("09 SQL", "Postgres names every avg() result 'avg'",
      "three averages in one SELECT produce duplicate column names",
      "alias every aggregate explicitly", "live"),
-    ("08 SQL", "int(31.5) uses banker's rounding",
+    ("09 SQL", "int(31.5) uses banker's rounding",
      "31.5 Hz becomes band_32hz, 62.5 would become band_62hz",
      "state the rule, and test the boundary case", "live"),
 ]
 
 
-def nb_09() -> object:
+def nb_10() -> object:
     rows_md = "\n".join(
         f"| {i} | {w} | {sym} | {fix} | {v} |"
         for i, (w, breaks, sym, fix, v) in enumerate(TRAPS, 1)
@@ -2167,7 +2468,7 @@ print("  before building anything on top of it.")
 # ===========================================================================
 # 05 -- Credentialed API
 # ===========================================================================
-def nb_05() -> object:
+def nb_06() -> object:
     b = build(
         md("""
 # 05 — Authenticate, then query
@@ -2438,7 +2739,7 @@ print("  and need no account -- it is only the data download that is credentiale
 # ===========================================================================
 # 08 -- Capstone
 # ===========================================================================
-def nb_08() -> object:
+def nb_09() -> object:
     b = build(
         md("""
 # 08 — Capstone: join three sources
@@ -2622,7 +2923,7 @@ wstamps = pd.to_datetime(
          minute=pd.to_numeric(wraw.mm)),
     utc=True,
 ).dt.tz_localize(None)
-# .to_numpy() -- passing the Series would align on index and yield all-NaN (Notebook 06)
+# .to_numpy() -- passing the Series would align on index and yield all-NaN (Notebook 07)
 wind = pd.DataFrame(
     {"wind": pd.to_numeric(wraw.WSPD, errors="coerce").replace(99.0, np.nan).to_numpy()},
     index=wstamps,
@@ -2853,8 +3154,8 @@ data problem.
 It is a **central California upwelling coast**. Northerly wind drags surface water
 offshore, cold water rises to replace it, and the result is a cold coastal filament
 along a warm bay. That single fact explains the spatial structure in Notebook 02, the
-salinity structure in Notebook 04, and most of what makes the acoustic question in
-Notebook 08 worth asking.
+salinity structure in Notebook 05, and most of what makes the acoustic question in
+Notebook 09 worth asking.
 
 **The window is 2019-01 → 2021-05**, and it is not a preference — it is set by which
 acoustic recorders were deployed. Every source is clipped to the intersection so the
@@ -2881,19 +3182,21 @@ currents, which is why the project was built with a fallback ladder rather than 
 a single dependency.
 """),
         md("""
-## The six access patterns
+## The access patterns
 
 The datasets are examples. The patterns are the transferable part, and they are what the
 notebooks are organised by:
 
 1. **REST griddap** — index expression, format negotiation (Notebook 02)
 2. **Cloud object storage** — list a prefix, fetch an object (Notebook 03)
-3. **Browsable tree + netCDF** — HTML listing, CF conventions (Notebook 04)
-4. **Credentialed API + catalogue** — the one that needs an account (Notebook 05)
-5. **Fixed-format text** — no API at all, and the most error-prone (Notebook 06)
-6. **Domain library** — when to stop hand-rolling (Notebook 07)
+3. **Access policy** — who is allowed to read it, and how the answer is encoded
+   (Notebook 04)
+4. **Browsable tree + netCDF** — HTML listing, CF conventions (Notebook 05)
+5. **Credentialed API + catalogue** — the one that needs an account (Notebook 06)
+6. **Fixed-format text** — no API at all, and the most error-prone (Notebook 07)
+7. **Domain library** — when to stop hand-rolling (Notebook 08)
 
-Each notebook follows the same six steps, and the consistency is itself part of the
+Each notebook follows the same shape, and the consistency is itself part of the
 lesson:
 
 1. **What you should get** — expected size, shape and range, stated *before* the request
@@ -2951,9 +3254,13 @@ off:
 make lab-offline
 ```
 
-**Fast lane.** If you are comfortable with raw HTTP, notebooks 02, 03, 05 and 06 are
-mostly review. The ones worth your time are **01** (the spine), **09** (the trap table)
-and **08** (the result).
+**Fast lane.** If you are comfortable with raw HTTP, notebooks 02, 03, 05, 06 and 07
+are mostly review. The ones worth your time are **01** (the spine), **04** (the one
+where the *services* teach you something), **10** (the trap table) and **09** (the
+result).
+
+**Notebook 04 needs a live network.** It reads the current access policy of S3 and
+BigQuery, so it bypasses the cache on purpose — see its own opening section.
 
 ## The one habit
 
@@ -2961,7 +3268,7 @@ and **08** (the result).
 count, a physical range.
 
 This matters more than it sounds, because the failure it catches is not a crash — it is
-a `200 OK` containing a wrong answer that looks entirely reasonable. Notebook 09 lists
+a `200 OK` containing a wrong answer that looks entirely reasonable. Notebook 10 lists
 **{n_traps} traps** found while building this material -- {n_live} of them reproduced against
 live services -- and that habit is what would have
 

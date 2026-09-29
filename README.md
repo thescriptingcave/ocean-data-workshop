@@ -12,7 +12,7 @@ to interpret them, not to predict them.
 | | if you have… | start |
 |---|---|---|
 | **Workshop Intro** | never fetched a URL | [`beginners/README.md`](beginners/README.md) — 5 notebooks, 40 min, 5 packages |
-| **Workshop Advanced** | used `requests` before | [`notebooks/README.md`](notebooks/README.md) — 10 notebooks, a database, ~30 catalogued traps |
+| **Workshop Advanced** | used `requests` before | [`notebooks/README.md`](notebooks/README.md) — 11 notebooks, a database, ~39 catalogued traps |
 
 The Intro is standalone: no database, no Docker, no `make`, no `.env`, no account, no
 API key. `pip install -r beginners/requirements.txt` and open Jupyter Lab.
@@ -49,7 +49,7 @@ tests it that way so it stays true.
 
 ## Workshop Advanced
 
-Ten notebooks on getting real ocean data out of public APIs — the parts that are
+Eleven notebooks on getting real ocean data out of public APIs — the parts that are
 documented badly, and the parts that are not documented at all. Assumes you have
 fetched a URL before; if not, do the Intro first.
 
@@ -79,7 +79,7 @@ the datasets do not. Ends with a result: across 30 frequency bands, wind's corre
 with underwater noise is 0.204 below 500 Hz and 0.699 above 2 kHz, and every one of the 9
 bands that fails a block-bootstrap significance test is below 200 Hz.
 
-**35 traps** found while building it, catalogued in Notebook 09 — **34 reproduced against
+**39 traps** found while building it, catalogued in Notebook 10 — **39 reproduced against
 live services**, the rest documented from the service's own behaviour, and not one of them documented anywhere.
 
 ## Phase -1: data access audit
