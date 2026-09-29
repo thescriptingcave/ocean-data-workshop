@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -41,6 +42,14 @@ ROOT = Path(__file__).resolve().parents[2]
 os.environ.setdefault("OCEAN_SIM_OFFLINE", "0")
 
 DB_PORT = int(os.environ.get("OCEAN_SIM_PORT", "5432"))
+
+# Compose project name, defaulting to this checkout's directory so that two clones on
+# one machine get separate containers and separate volumes instead of colliding.
+PROJECT = (
+    os.environ.get("OCEAN_SIM_PROJECT")
+    or re.sub(r"[^a-z0-9_-]+", "-", ROOT.name.lower()).strip("-")
+    or "ocean-sim"
+)
 
 
 def step(n: int, total: int, title: str) -> None:
@@ -119,13 +128,14 @@ def check_prereqs() -> None:
 def start_db() -> None:
     step(2, 5, f"Starting PostgreSQL + TimescaleDB on port {DB_PORT}")
 
-    env = {**os.environ, "OCEAN_SIM_PORT": str(DB_PORT)}
+    env = {**os.environ, "OCEAN_SIM_PORT": str(DB_PORT), "OCEAN_SIM_PROJECT": PROJECT}
     r = subprocess.run(
         ["docker", "compose", "up", "-d", "--wait"],
         capture_output=True, text=True, cwd=ROOT, timeout=300, env=env,
     )
     if r.returncode != 0:
-        if "port is already allocated" in (r.stderr + r.stdout):
+        out = r.stderr + r.stdout
+        if "port is already allocated" in out:
             die(
                 f"host port {DB_PORT} is already in use",
                 "You probably have a local PostgreSQL. Either stop it, or pick another:\n"
@@ -133,14 +143,25 @@ def start_db() -> None:
                 "The port is read from OCEAN_SIM_PORT by the database and by every\n"
                 "script that connects, so this stays consistent.",
             )
-        die(f"docker compose up failed\n{(r.stderr or r.stdout)[-800:]}")
+        if "already in use by container" in out or "Conflict" in out:
+            die(
+                "another checkout of this repo is already running its database",
+                "Two checkouts otherwise share one compose project and one volume. Give\n"
+                "this checkout its own project so the two stay independent:\n"
+                "    OCEAN_SIM_PROJECT=$(basename $PWD) uv run workshop-setup --port 5433\n"
+                "or tear the other one down first:\n"
+                "    docker compose -p ocean-sim down",
+            )
+        die(f"docker compose up failed\n{out[-800:]}")
 
     ok("container healthy (docker compose --wait consumed the healthcheck)")
 
     # Confirm we can actually query it, not merely that the container is up.
+    # `docker compose exec` resolves the container itself, so nothing here hardcodes
+    # the name -- which is what lets two checkouts coexist.
     r = run(
-        ["docker", "exec", "ocean-sim-db", "psql", "-U", "postgres", "-d", "ocean_sim",
-         "-tAc", "select 1"],
+        ["docker", "compose", "exec", "-T", "db", "psql", "-U", "postgres",
+         "-d", "ocean_sim", "-tAc", "select 1"],
         check=False, quiet=True, timeout=60,
     )
     if r.returncode != 0:

@@ -1,21 +1,18 @@
-# Workshop database: PostgreSQL 17 + TimescaleDB.
-#
-# Pinned, deliberately. The tag was `latest-pg17`, which means every attendee who runs
-# `docker compose up` on a different day can get a different image. For a workshop where
-# people set this up across several weeks, an unpinned tag means the thing you tested is
-# not the thing they ran. This resolves to exactly the image that was already in use
-# (TimescaleDB 2.30.1, PostgreSQL 17.11), so pinning changes no behaviour.
-#
-# Port is overridable because a hardcoded 5432 fails with `port is already allocated`
-# for anyone already running a local PostgreSQL -- which is most people who write Python.
-# Override with OCN_SIM_PORT, e.g.  `OCEAN_SIM_PORT=5433 docker compose up -d`.
-# Every script that connects reads the same variable, via src/ocean_sim/dsn.py.
-name: ocean-sim
+name: ${OCEAN_SIM_PROJECT:-ocean-sim}
 
 services:
   db:
     image: timescale/timescaledb:2.30.1-pg17
-    container_name: ocean-sim-db
+    # NO `container_name:` here, deliberately.
+    #
+    # A hardcoded container name means two checkouts of this repo on one machine
+    # collide, even on different host ports -- and the error is a wall of Docker text
+    # ending in "Conflict. The container name is already in use". Found by cloning the
+    # repo to a second directory during a from-scratch setup test, which is the exact
+    # thing an attendee does when they want to try it without touching their real
+    # checkout. Letting compose derive the name from the project keeps two checkouts
+    # independent. Everything that needs the container goes through `docker compose
+    # exec`, which resolves it.
     ports:
       - "${OCEAN_SIM_PORT:-5432}:5432"
     environment:
