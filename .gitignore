@@ -3,7 +3,11 @@
 *.nc
 *.nc4
 *.csv.gz
-data/
+# Anchored to the repo root. An unanchored 'data/' also matches
+# src/ocean_sim/data/, which silently excluded the three loaders from every
+# commit -- found by cloning to a clean directory and getting
+# 'ModuleNotFoundError: No module named ocean_sim.data'.
+/data/
 runs/
 
 # secrets — never commit
