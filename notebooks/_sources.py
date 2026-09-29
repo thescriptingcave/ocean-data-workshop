@@ -183,10 +183,29 @@ ARGO_FILES = {
     "tech": f"{ARGO_DIR}/{ARGO_FLOAT}_tech.nc",
 }
 
-# There is NO per-float index text file at this path (both _prof_index.txt and
-# index/1900063.txt return 404). The aggregated _prof.nc is the right granularity
-# anyway: 98 cycles in 673 KB, versus 98 separate files.
+# The demo float. NOTE: it is in the **North Atlantic** (24-27 N, 22-18 W), not the
+# Pacific, and its cycles run 2002-2004. It is here because it is a small, complete,
+# well-formed example of the file structure -- not because it is near the site. The
+# workshop's local data comes from ERDDAP, GCS and NDBC.
+#
+# On finding a float near a given location, which is the obvious next question:
+#
+#   * The coriolis DAC holds 4,261 floats. There is **no index and no search API** --
+#     tested /index/, /dac/index/, <wmo>_prof_index.txt and index/<wmo>.txt, all 404.
+#   * No small file answers "where is it?" either. _meta.nc (35 KB) is configuration
+#     and has no LATITUDE. _tech.nc (2.8 MB) is instrument metadata and has no LATITUDE
+#     either. **Position lives in _prof.nc (689 KB).**
+#   * So screening the DAC for a float near a site costs 689 KB per candidate: 2.9 GB
+#     for all 4,261.
+#
+# That is a real cost, and a property of how the archive is laid out rather than a
+# missing convenience. Notebook 04 states it rather than working around it quietly.
 ARGO_EXPECTED_BYTES = 689_348
+
+
+def argo_meta_url(wmo: str) -> str:
+    """Metadata for any float. Configuration only -- **no position** (see above)."""
+    return f"{GDAC_BASE}/{wmo}/{wmo}_meta.nc"
 
 
 # ---------------------------------------------------------------------------
