@@ -111,6 +111,13 @@ jobs:
     # files from every commit, and a compose file that could not be started twice.
     env:
       OCEAN_DATA_WORKSHOP_OFFLINE: "1"
+      # Job level, not step level. The first version set this on the load step only, so
+      # the notebook step fell back to the default DSN -- which carries the default
+      # password, not the service's -- and notebook 08 reported "database unavailable"
+      # on a database that was running, loaded, and one step earlier reachable. A
+      # half-scoped environment variable is worse than an unset one, because the step
+      # that sets it works and hides the break.
+      OCEAN_DATA_WORKSHOP_DSN: postgresql://postgres:workshop@localhost:5432/ocean_data_workshop
     services:
       db:
         image: timescale/timescaledb:2.30.1-pg17
@@ -136,11 +143,8 @@ jobs:
 
       - name: load the data
         # Points at the service container above rather than docker compose, so there
-        # is no second container and no port to collide with. load_db.py applies
-        # the schema itself -- an earlier version of this step did it inline too,
-        # which was redundant.
-        env:
-          OCEAN_DATA_WORKSHOP_DSN: postgresql://postgres:workshop@localhost:5432/ocean_data_workshop
+        # is no second container and no port to collide with. The DSN comes from the
+        # job-level env, shared with the notebook step below.
         run: uv run python scripts/load_db.py
 
       - name: the capstone, which needs the database
