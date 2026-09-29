@@ -189,7 +189,16 @@ def load_data() -> None:
 
 
 def prefetch() -> None:
-    step(5, 5, "Prefetching API responses for the notebooks")
+    step(5, 5, "Preparing API responses for the notebooks")
+
+    archive = ROOT / "notebooks" / "cache-archive.tar.gz"
+    if archive.exists():
+        ok("cache archive present -- the notebooks will not need a network")
+        run(["uv", "run", "python", "scripts/prefetch.py", "--install"], timeout=600)
+        return
+
+    warn("no cache archive -- fetching over the network")
+    warn("if this fails the notebooks cannot be guaranteed to run offline")
     run(["uv", "run", "python", "scripts/prefetch.py"], timeout=3600)
 
 

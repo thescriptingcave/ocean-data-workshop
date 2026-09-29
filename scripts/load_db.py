@@ -266,27 +266,57 @@ def main() -> int:
     load_sources()
 
     print("\nloading ...")
-    for name, fn in (
-        ("ocean_profile_daily", load_ocean),
-        ("wind_daily", load_wind),
-        ("acoustic_tol_hourly", load_acoustic),
-        ("detection_hourly", load_detections),
+    # Each source is loaded independently, and a failure is reported rather than fatal.
+    #
+    # GLORYS is the only credentialed source and a clean machine has no Copernicus
+    # account. Previously that aborted the whole run, so an attendee without an account
+    # got an empty database AND no wind, acoustic or detection data: three anonymous
+    # sources lost because one needs a login. Notebook 08 needs wind and acoustics, so
+    # that is the difference between a usable workshop and none.
+    loaded: dict[str, int] = {}
+    failed: dict[str, str] = {}
+
+    for name, fn, needs_account in (
+        ("wind_daily", load_wind, False),
+        ("acoustic_tol_hourly", load_acoustic, False),
+        ("detection_hourly", load_detections, False),
+        ("ocean_profile_daily", load_ocean, True),
     ):
-        n = fn()
-        print(f"  {name:24} {n:>9,} rows")
+        try:
+            loaded[name] = fn()
+            print(f"  {name:24} {loaded[name]:>9,} rows")
+        except Exception as exc:
+            failed[name] = f"{type(exc).__name__}: {str(exc).splitlines()[0][:64]}"
+            tag = "SKIPPED" if needs_account else "FAILED"
+            print(f"  {name:24} {tag:>9}  {failed[name]}")
+
+    if not loaded:
+        print("\n  Nothing loaded -- the database is empty and useless.")
+        print("  Check the network, then re-run. Notebook 08 needs the database;")
+        print("  notebooks 00-07 and 09 do not and work without it.")
+        return 1
+
 
     with psycopg.connect(DSN) as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT relname, n_live_tup FROM pg_stat_user_tables"
-                " WHERE relname IN ('ocean_profile_daily','wind_daily',"
-                "'acoustic_tol_hourly','detection_hourly','source') ORDER BY relname"
-            )
-            print("\n  table                 estimated rows")
-            for name, _est in cur.fetchall():
+            for name in ("ocean_profile_daily", "acoustic_tol_hourly",
+                         "detection_hourly", "wind_daily"):
                 cur.execute(f"SELECT count(*) FROM {name}")
-                print(f"  {name:22} {cur.fetchone()[0]:>9,}")
+                n = cur.fetchone()[0]
+                print(f"  {name:22} {n:>9,}{'' if n else '   <- empty'}")
+
     print(f"\nwindow: {WINDOW_START} .. {WINDOW_END}")
+
+    if failed:
+        print(f"\n  {len(failed)} source(s) unavailable:")
+        for name, reason in failed.items():
+            print(f"    {name}: {reason}")
+        print("\n  Everything else loaded and the notebooks work. Notebook 08 joins")
+        print("  wind to acoustics, so a missing ocean profile does not affect it.")
+        if "ocean_profile_daily" in failed:
+            print("  To get the ocean profile, register free at")
+            print("    https://data.marine.copernicus.eu/register")
+            print("  then run `copernicusmarine login` and re-run this script.")
     return 0
 
 

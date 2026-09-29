@@ -29,6 +29,8 @@ __pycache__/
 # prefetched API responses -- real data, but regenerable, and large
 notebooks/.cache/
 # scratch files the notebooks write into the working directory
+# the cache-archive IS committed: it is what makes the workshop run with no network
+notebooks/cache-archive.tar.gz
 notebooks/_*.nc
 notebooks/_traps.csv
 
