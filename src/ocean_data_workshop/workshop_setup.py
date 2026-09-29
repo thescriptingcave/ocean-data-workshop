@@ -45,11 +45,25 @@ DB_PORT = int(os.environ.get("OCEAN_DATA_WORKSHOP_PORT", "5432"))
 
 # Compose project name, defaulting to this checkout's directory so that two clones on
 # one machine get separate containers and separate volumes instead of colliding.
-PROJECT = (
-    os.environ.get("OCEAN_DATA_WORKSHOP_PROJECT")
-    or re.sub(r"[^a-z0-9_-]+", "-", ROOT.name.lower()).strip("-")
-    or "ocean-sim"
-)
+def _project_name() -> str:
+    """Compose project name, defaulting to this checkout's directory.
+
+    Exported into os.environ in main() so that *every* subprocess inherits it. It used
+    to be passed only to `docker compose up`, while the later `docker compose exec`
+    inherited the plain environment -- so the two resolved different projects whenever
+    the directory name was not the default, and setup died at "postgres is not
+    accepting connections" on a database it had itself just started. Local testing hid
+    it: the main checkout is called ocean-sim, and a container left over from an earlier
+    run happened to be healthy under the name the exec resolved to.
+    """
+    return (
+        os.environ.get("OCEAN_DATA_WORKSHOP_PROJECT")
+        or re.sub(r"[^a-z0-9_-]+", "-", ROOT.name.lower()).strip("-")
+        or "ocean-data-workshop"
+    )
+
+
+PROJECT = _project_name()
 
 
 def step(n: int, total: int, title: str) -> None:
@@ -146,10 +160,9 @@ def check_prereqs() -> None:
 def start_db() -> None:
     step(2, 6, f"Starting PostgreSQL + TimescaleDB on port {DB_PORT}")
 
-    env = {**os.environ, "OCEAN_DATA_WORKSHOP_PORT": str(DB_PORT), "OCEAN_DATA_WORKSHOP_PROJECT": PROJECT}
     r = subprocess.run(
         ["docker", "compose", "up", "-d", "--wait"],
-        capture_output=True, text=True, cwd=ROOT, timeout=300, env=env,
+        capture_output=True, text=True, cwd=ROOT, timeout=300,
     )
     if r.returncode != 0:
         out = r.stderr + r.stdout
@@ -168,7 +181,7 @@ def start_db() -> None:
                 "this checkout its own project so the two stay independent:\n"
                 "    OCEAN_DATA_WORKSHOP_PROJECT=$(basename $PWD) uv run workshop-setup --port 5433\n"
                 "or tear the other one down first:\n"
-                "    docker compose -p ocean-sim down",
+                "    docker compose -p ocean-data-workshop down",
             )
         die(f"docker compose up failed\n{out[-800:]}")
 
@@ -260,9 +273,13 @@ def main() -> int:
     ap.add_argument("--port", type=int, default=None, help="host port (default 5432)")
     args = ap.parse_args()
 
+    # Export before anything else so that every subprocess -- including the bare
+    # `docker compose exec` in start_db() -- resolves the same database and the same
+    # compose project as the `up` that created them.
+    os.environ["OCEAN_DATA_WORKSHOP_PROJECT"] = PROJECT
     if args.port is not None:
         DB_PORT = args.port
-        os.environ["OCEAN_DATA_WORKSHOP_PORT"] = str(DB_PORT)
+    os.environ["OCEAN_DATA_WORKSHOP_PORT"] = str(DB_PORT)
 
     print("=" * 72)
     print("  Ocean data workshop -- environment setup")
