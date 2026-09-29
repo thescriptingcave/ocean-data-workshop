@@ -16,17 +16,18 @@ make notebook     # render + execute, saving output -- this is the supported pat
 Open `notebooks/01_request_three_ways.ipynb` in an editor if you want to read a notebook,
 but make changes in the Python.
 
-The beginners tier is generated the same way, from a single self-contained file:
+Workshop Intro (`beginners/`) is generated the same way, from a single self-contained
+file:
 
 ```bash
 make beginners    # scripts/build_beginners.py --execute
 ```
 
-`beginners/requirements.txt` is the beginners' *complete* dependency list and is
+`beginners/requirements.txt` is Workshop Intro's *complete* dependency list and is
 deliberately separate from the root `pyproject.toml`. Do not add project packages to
-it — the CI `beginners` job installs only that file and fails if the tier has grown a
-dependency on the database, the cache or the rest of the repo. That isolation is the
-feature.
+it — the CI `workshop intro` job installs only that file and fails if the tier has
+grown a dependency on the database, the cache or the rest of the repo. That isolation
+is the feature.
 
 ## Before you push
 

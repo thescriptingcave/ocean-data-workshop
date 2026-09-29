@@ -104,10 +104,10 @@ jobs:
           echo "cache unchanged: the notebooks really are running offline"
 
   beginners:
-    name: beginners tier
+    name: workshop intro
     runs-on: ubuntu-latest
     # Deliberately does NOT use `uv sync` on the root project, and does not install
-    # any of it. The beginners tier is meant to be standalone -- five packages from
+    # any of it. Workshop Intro is meant to be standalone -- five packages from
     # beginners/requirements.txt -- and the only way to keep that true is to keep
     # testing it that way. If it ever starts depending on the database, the cache or
     # the root pyproject, this job fails.
@@ -122,7 +122,7 @@ jobs:
       # .ipynb files in jupyter lab -- so they are correctly absent from
       # beginners/requirements.txt, and are installed here only to drive CI.
       - run: pip install nbclient nbformat
-      - name: execute the beginners notebooks
+      - name: execute the Workshop Intro notebooks
         run: python scripts/build_beginners.py --execute
 
   integration:

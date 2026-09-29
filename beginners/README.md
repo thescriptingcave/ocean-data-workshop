@@ -1,4 +1,4 @@
-# Beginners — your first API
+# Workshop Intro — your first API
 
 Five notebooks. About 40 minutes. **No database, no Docker, no account, no API key.**
 
@@ -51,8 +51,9 @@ oceanography.
 
 ## After this
 
-`../notebooks/` — the same ideas against harder services, with a database, and about
-thirty catalogued failure modes. Come back to it when this is comfortable.
+**Workshop Advanced** (`../notebooks/`) — the same ideas against harder services, with a
+database, and about thirty catalogued failure modes. Come back to it when this is
+comfortable.
 
 Or skip it, which is a legitimate choice: take one of these instead.
 

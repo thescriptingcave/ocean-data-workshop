@@ -1,4 +1,4 @@
-# Data retrieval workshop
+# Workshop Advanced — data retrieval
 
 Ten notebooks on getting real ocean data out of public APIs — the parts that are
 documented badly, and the parts that are not documented at all.
@@ -6,6 +6,9 @@ documented badly, and the parts that are not documented at all.
 Built around real data from **Monterey Bay, California**: sea surface temperature from
 ERDDAP, 30-band underwater sound from NOAA's passive acoustic archive, wind from an NDBC
 buoy, temperature/salinity/currents from GLORYS, and T/S profiles from an Argo float.
+
+**If you have never fetched a URL, do [Workshop Intro](../beginners/README.md) first** —
+40 minutes, five packages, no database. These notebooks assume you already have.
 
 ## Also read
 

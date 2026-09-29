@@ -11,11 +11,11 @@ to interpret them, not to predict them.
 
 | | if you have… | start |
 |---|---|---|
-| **Beginners** | never fetched a URL | [`beginners/README.md`](beginners/README.md) — 5 notebooks, 40 min, 5 packages |
-| **Workshop** | used `requests` before | [`notebooks/README.md`](notebooks/README.md) — 10 notebooks, a database, ~30 catalogued traps |
+| **Workshop Intro** | never fetched a URL | [`beginners/README.md`](beginners/README.md) — 5 notebooks, 40 min, 5 packages |
+| **Workshop Advanced** | used `requests` before | [`notebooks/README.md`](notebooks/README.md) — 10 notebooks, a database, ~30 catalogued traps |
 
-The beginners tier is standalone: no database, no Docker, no `make`, no `.env`, no
-account, no API key. `pip install -r beginners/requirements.txt` and open Jupyter Lab.
+The Intro is standalone: no database, no Docker, no `make`, no `.env`, no account, no
+API key. `pip install -r beginners/requirements.txt` and open Jupyter Lab.
 
 Also:
 
@@ -28,7 +28,7 @@ covered; see the bottom of that file.
 If you are contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md) — the notebooks are
 generated, do not edit the `.ipynb` files.
 
-## The beginners tier
+## Workshop Intro
 
 If you have never fetched a URL, start here and skip everything below.
 
@@ -47,11 +47,11 @@ Deliberately nothing else: no database, no Docker, no `make`, no `.env`, no cach
 accounts. It does not import a single thing from the rest of this repository, and CI
 tests it that way so it stays true.
 
-## The data retrieval workshop
+## Workshop Advanced
 
 Ten notebooks on getting real ocean data out of public APIs — the parts that are
 documented badly, and the parts that are not documented at all. Assumes you have
-fetched a URL before; if not, do the beginners tier first.
+fetched a URL before; if not, do the Intro first.
 
 ```bash
 make                            # setup, then open Jupyter Lab
@@ -160,7 +160,7 @@ GCS JSON API, which needs no CLI at all.
 ## Layout
 
 ```
-beginners/       the standalone tier — 5 notebooks, own requirements.txt
+beginners/       Workshop Intro — 5 notebooks, own requirements.txt
   00_..ipynb     a URL is a thing you can fetch
   01_..ipynb     comma-separated text
   02_..ipynb     JSON

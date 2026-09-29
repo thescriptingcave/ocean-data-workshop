@@ -1,10 +1,10 @@
-"""Generate the beginners notebooks.
+"""Generate the Workshop Intro notebooks (``beginners/``).
 
-A separate tier from ``notebooks/``, and deliberately much smaller. The workshop
-tier assumes you can already hold six access patterns in your head; this one assumes
-you have never fetched a URL.
+Workshop Advanced (``notebooks/``) assumes you can already hold six access patterns in
+your head; Workshop Intro assumes you have never fetched a URL. The two tiers share
+no code and no setup, and this one is deliberately much smaller.
 
-Design decisions that came out of feedback that the workshop tier was too hard:
+Design decisions that came out of feedback that the Advanced tier was too hard:
 
   * **Plain ``requests``.** No caching helper, no session wrapper. They learn the
     library they will use at work, not one that exists only in this repo.
@@ -13,9 +13,8 @@ Design decisions that came out of feedback that the workshop tier was too hard:
   * **Three response shapes**, because those are what actually differ: delimited
     text, JSON, and compressed text. Same four techniques applied three times, so
     the second and third are recognisable.
-  * **A trap appears only after the working version.** The workshop led with the
-    traps; here you fetch it successfully first, then see what the library quietly
-    fixed for you.
+  * **A trap appears only after the working version.** Advanced led with the traps;
+    here you fetch it successfully first, then see what the library quietly fixed.
   * **Short.** 8-14 cells each. If a notebook is hard to follow it is too long,
     not too subtle.
 
@@ -819,8 +818,8 @@ the only part you will need at a job that was not oceanography.
 
 ## Where to go next
 
-`../notebooks/` — the same ideas, against harder services, with the failure modes
-catalogued. Nine notebooks, a database, and about thirty traps.
+**Workshop Advanced** (`../notebooks/`) — the same ideas, against harder services, with
+the failure modes catalogued. Ten notebooks, a database, and about thirty traps.
 
 **Or** take this one of three ways, which is a more honest order than doing them in
 sequence:

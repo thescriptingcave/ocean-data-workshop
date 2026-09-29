@@ -1,8 +1,8 @@
 # Getting started
 
-> **Never fetched a URL?** You do not need Docker, a database or a Copernicus account.
-> Start at [`beginners/README.md`](beginners/README.md) instead — 5 packages, 5
-> notebooks, 40 minutes. The rest of this page is for the ten-notebook workshop.
+> **This page is for Workshop Advanced.** Never fetched a URL? Start at
+> [**Workshop Intro**](beginners/README.md) instead — 5 packages, 5 notebooks,
+> 40 minutes, and no Docker, database or Copernicus account.
 
 From nothing to running notebooks. About **85 seconds** on a working connection, plus
 the time to download Docker if you do not have it.

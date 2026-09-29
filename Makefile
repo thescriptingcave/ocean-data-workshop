@@ -57,11 +57,11 @@ lab: kernel
 lab-offline: kernel
 	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) jupyter lab $(NB_DIR)/
 
-## beginners: rebuild and run the beginners tier (5 notebooks, no database)
+## beginners: rebuild and run Workshop Intro (5 notebooks, no database)
 ##
-## Separate from `make notebook` on purpose. The beginners tier assumes no API
-## experience and has no dependency on the database, the cache or the Makefile --
-## it is the thing to give someone who has never fetched a URL.
+## Separate from `make notebook` on purpose. Workshop Intro assumes no API experience
+## and has no dependency on the database, the cache or the Makefile -- it is the
+## thing to give someone who has never fetched a URL.
 beginners:
 	@$(UV) run --with duckdb python scripts/build_beginners.py --execute
 
