@@ -2338,7 +2338,7 @@ else:
     print()
     print("  What you would have got, from the project's own loaded copy:")
     print("    30 days x 19 levels over 0.5-55.8 m, surface 15.62 C")
-    print("    2019-2021: 16,188 rows in ocean_profile_daily")
+    print("    2019-2021: 16,188 rows in ocean_profile_daily (needs `make db-ocean`)")
 '''),
 
         md("""
@@ -2506,10 +2506,16 @@ The schema is in `learning/schema.sql`, which is written to be read. Four tables
 
 | table | rows | grain |
 |---|---|---|
-| `ocean_profile_daily` | 16,188 | day × depth |
+| `ocean_profile_daily` | 16,188, **or 0** | day × depth |
 | `acoustic_tol_hourly` | 19,570 | hour × frequency band |
 | `detection_hourly` | 12,861 | hour × taxon |
 | `wind_daily` | 784 | day |
+
+`ocean_profile_daily` is the odd one out: it comes from GLORYS, which needs a
+Copernicus account and is by far the slowest part of setup (~325 MB of transfer),
+so **`load_db.py` skips it by default**. `make db-ocean` gets it. Everything below —
+including the result — needs only wind and acoustics, so if that table is empty
+nothing here breaks; it just has nothing to say about temperature and salinity.
 
 The window is 2019-01 → 2021-05, set by the acoustic deployments, and every source is
 clipped to it so the join has no dangling edges.

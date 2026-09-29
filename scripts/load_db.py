@@ -18,6 +18,7 @@ Run:  uv run python scripts/load_db.py
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -258,7 +259,46 @@ def load_detections() -> int:
     return len(records)
 
 
+# (table, loader, needs_a_copernicus_account)
+#
+# The ocean profile is last and gated because it is the slowest thing here by an order of
+# magnitude: one variable over this window transfers ~81 MB and there are four of them.
+# It also needs a Copernicus account. The workshop's result -- wind against underwater
+# noise -- needs only wind and acoustics, which is why it is opt-in.
+SOURCES = [
+    ("wind_daily", load_wind, False),
+    ("acoustic_tol_hourly", load_acoustic, False),
+    ("detection_hourly", load_detections, False),
+    ("ocean_profile_daily", load_ocean, True),
+]
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser(description="Load the workshop data into PostgreSQL.")
+    ap.add_argument(
+        "--with-ocean", action="store_true",
+        help="also load the GLORYS ocean profile: slowest part of setup, needs a "
+             "Copernicus account, and only notebook 08 uses it",
+    )
+    ap.add_argument("--only", nargs="*", metavar="TABLE",
+                    help="load only these tables")
+    args = ap.parse_args()
+
+    # The default set EXCLUDES the ocean profile. Listing every source and then
+    # subtracting it was the first attempt, and it meant the default quietly included
+    # the thing the flag was supposed to gate.
+    no_account = {n for n, _, acct in SOURCES if not acct}
+    if args.only:
+        wanted = set(args.only)
+    else:
+        wanted = set(no_account)
+    if args.with_ocean:
+        wanted.add("ocean_profile_daily")
+    if "ocean_profile_daily" not in wanted:
+        print("  ocean_profile_daily  skipped: the GLORYS subset is by far the slowest\n"
+              "                         part of setup and only notebook 08 uses it. To\n"
+              "                         include it:  load_db.py --with-ocean")
+
     print(f"DSN: {DSN.split('@')[-1]}")
     print("\napplying schema ...")
     apply_schema()
@@ -276,19 +316,21 @@ def main() -> int:
     loaded: dict[str, int] = {}
     failed: dict[str, str] = {}
 
-    for name, fn, needs_account in (
-        ("wind_daily", load_wind, False),
-        ("acoustic_tol_hourly", load_acoustic, False),
-        ("detection_hourly", load_detections, False),
-        ("ocean_profile_daily", load_ocean, True),
-    ):
+    for name, fn, needs_account in SOURCES:
+        if name not in wanted:
+            print(f"  {name:24} {'SKIPPED':>9}  not requested")
+            continue
+        # Announce BEFORE starting. A download that takes minutes used to print nothing
+        # at all while it happened, so a slow machine looked exactly like a hung one --
+        # which is the worst possible ambiguity during a first-time setup.
+        print(f"  {name:24} {'fetching' if needs_account else 'loading'}", flush=True)
         try:
             loaded[name] = fn()
-            print(f"  {name:24} {loaded[name]:>9,} rows")
+            print(f"  {name:24} {loaded[name]:>9,} rows", flush=True)
         except Exception as exc:
             failed[name] = f"{type(exc).__name__}: {str(exc).splitlines()[0][:64]}"
             tag = "SKIPPED" if needs_account else "FAILED"
-            print(f"  {name:24} {tag:>9}  {failed[name]}")
+            print(f"  {name:24} {tag:>9}  {failed[name]}", flush=True)
 
     if not loaded:
         print("\n  Nothing loaded -- the database is empty and useless.")

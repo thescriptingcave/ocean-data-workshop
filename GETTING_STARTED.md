@@ -86,12 +86,18 @@ That is the whole thing. It:
 1. checks Docker is installed and running
 2. starts PostgreSQL 17 + TimescaleDB and **waits for it to be healthy**
 3. applies the schema from `learning/schema.sql`
-4. downloads ~15 MB of real data and loads it
+4. downloads ~15 MB of real data and loads it (the GLORYS ocean profile is
+   **not** included by default — see below)
 5. warms the API cache so the notebooks do not depend on the network
 6. registers the Jupyter kernel and checks that `jupyter lab` actually runs
 7. opens Jupyter Lab on `notebooks/`
 
-Typical time from a fresh clone: **~85 seconds**, about 15 MB of downloads. Re-run it
+Typical time from a fresh clone: **under a minute**, about 15 MB of downloads.
+
+**About 40 seconds is the number to expect, and a much longer one is a problem, not
+patience.** The GLORYS ocean profile is the only slow part and it is skipped by
+default; if setup seems stuck, this is what to check — see the troubleshooting entry
+for "stuck at 4/6" below. Re-run it
 any time — every stage is idempotent.
 
 `make` is a build tool: already installed with the Xcode command line tools on macOS,
@@ -124,6 +130,7 @@ that it is doing so — the numbers are real, just not new.
 | `make check` | every notebook with the **network forbidden** — the offline guarantee |
 | `make fresh` | clone to a temp dir and run setup from nothing |
 | `make db` | reload the data |
+| `make db-ocean` | also load the GLORYS ocean profile (~325 MB, needs a Copernicus account) |
 | `PORT=5433 make` | use a different database port |
 
 ### Already have PostgreSQL on port 5432?
@@ -218,6 +225,8 @@ been rehearsed end to end yet — treat it as untested.
 
 | symptom | cause | fix |
 |---|---|---|
+| Setup seems stuck on "4/6 loading data" | it is downloading GLORYS, which is ~325 MB | Ctrl-C, then re-run. Finished downloads are cached in `data/` and will not repeat, so a second run is quick. To skip it entirely, that is already the default — if you are not seeing the skip message, you have a stale checkout: `git pull`. |
+| Setup seems stuck on "4/6 loading data" (older checkouts) | before this was made opt-in, the ocean profile was always downloaded | `git pull`, then re-run. |
 | `port is already allocated` | local PostgreSQL on 5432 | `PORT=5433 make` |
 | `container name is already in use` | another checkout of this repo | `OCEAN_DATA_WORKSHOP_PROJECT=$(basename $PWD) PORT=5433 make` |
 | `Docker is installed but the daemon is not responding` | Docker Desktop still starting | wait for it, then re-run |

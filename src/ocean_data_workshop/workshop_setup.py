@@ -42,6 +42,7 @@ ROOT = Path(__file__).resolve().parents[2]
 os.environ.setdefault("OCEAN_DATA_WORKSHOP_OFFLINE", "0")
 
 DB_PORT = int(os.environ.get("OCEAN_DATA_WORKSHOP_PORT", "5432"))
+WITH_OCEAN = False
 
 # Compose project name, defaulting to this checkout's directory so that two clones on
 # one machine get separate containers and separate volumes instead of colliding.
@@ -215,8 +216,11 @@ def apply_schema() -> None:
 
 def load_data() -> None:
     step(4, 6, "Loading data")
-    warn("first run downloads ~15 MB and takes a few minutes. Later runs are near-instant.")
-    run_visible(["uv", "run", "python", "scripts/load_db.py"])
+    warn("first run downloads ~15 MB. Later runs are near-instant.")
+    warn("the GLORYS ocean profile is NOT loaded unless you ask -- it is ~325 MB of")
+    warn("transfer for a table only notebook 08 uses. `make db-ocean` gets it.")
+    extra = ["--with-ocean"] if WITH_OCEAN else []
+    run_visible(["uv", "run", "python", "scripts/load_db.py", *extra])
 
 
 def prefetch() -> None:
@@ -264,13 +268,15 @@ def register_jupyter() -> None:
 
 
 def main() -> int:
-    global DB_PORT
+    global DB_PORT, WITH_OCEAN
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--skip-db", action="store_true", help="do not touch the database")
     ap.add_argument("--skip-load", action="store_true", help="start the DB but do not load")
     ap.add_argument("--skip-fetch", action="store_true", help="do not prefetch")
     ap.add_argument("--port", type=int, default=None, help="host port (default 5432)")
+    ap.add_argument("--with-ocean", action="store_true",
+                    help="also load the GLORYS ocean profile (~325 MB transfer)")
     args = ap.parse_args()
 
     # Export before anything else so that every subprocess -- including the bare
@@ -279,6 +285,8 @@ def main() -> int:
     os.environ["OCEAN_DATA_WORKSHOP_PROJECT"] = PROJECT
     if args.port is not None:
         DB_PORT = args.port
+    if args.with_ocean:
+        WITH_OCEAN = True
     os.environ["OCEAN_DATA_WORKSHOP_PORT"] = str(DB_PORT)
 
     print("=" * 72)

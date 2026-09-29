@@ -27,7 +27,7 @@ PORT_ARGS := $(if $(filter 5432,$(PORT)),,--port $(PORT))
 
 .DEFAULT_GOAL := all
 .PHONY: all setup lab lab-offline notebook notebooks test check check-notebooks check-independence \
-        lint unit fresh clean clean-cache help deps kernel prefetch db shell
+        lint unit fresh clean clean-cache help deps kernel prefetch db db-ocean shell
 
 ## all: set up, then open Jupyter Lab
 all: setup lab
@@ -68,9 +68,17 @@ notebooks:
 prefetch:
 	@$(UVRUN) python scripts/prefetch.py
 
-## db: apply the schema and load the data
+## db: apply the schema and load the data (the fast three)
 db:
 	@$(UVRUN) python scripts/load_db.py
+
+## db-ocean: also load the GLORYS ocean profile -- ~325 MB of transfer
+##
+## Deliberately separate. It is the slowest thing in setup by an order of magnitude,
+## it needs a Copernicus account, and only notebook 08 touches it. The workshop's
+## result -- wind against underwater noise -- needs only wind and acoustics.
+db-ocean:
+	@$(UVRUN) python scripts/load_db.py --with-ocean
 
 ## test: everything -- notebooks, independence, unit tests, lint
 test: check-notebooks check-independence unit lint

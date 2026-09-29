@@ -26,6 +26,8 @@ documented badly, and the parts that are not documented at all.
 make                            # setup, then open Jupyter Lab
 ```
 
+Under a minute from a fresh clone.
+
 That is the whole thing: it installs dependencies, starts the database and waits for it
 to be healthy, loads the data, warms the API cache, registers the Jupyter kernel, and
 opens Jupyter on the notebooks. If the network is bad, `make lab-offline` does the same
