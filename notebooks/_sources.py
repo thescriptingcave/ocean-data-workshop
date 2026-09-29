@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from _fetch import erddap, get  # noqa: E402,F401
+from _fetch import erddap, get  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # The site. Everything in the workshop is within ~20 km of this point.
@@ -59,19 +59,36 @@ def sst_url(
     box: tuple = SST_BOX,
     *,
     fmt: str = "csv",
-    one_per_day: bool = True,
+    point: bool = False,
 ) -> str:
     """An SST query URL for notebooks 01-02.
 
-    ``one_per_day`` adds the server-side directives ``.time=first .lat=first .lon=first``,
-    which return one point per day instead of the whole cube: 112 KB instead of 575 KB
-    for the same month. The leading dot on each is required -- without it ERDDAP
-    answers 400 with no explanation (see ``_fetch.erddap``).
+    ``point=True`` collapses the lat/lon box to a single cell, which is how you actually
+    reduce an ERDDAP response. Measured for September 2019 at this site:
+
+        full box (0.22 deg)   690,813 B   15,870 rows   23 x 23 cells per day
+        point   (degenerate)   1,324 B       30 rows   one cell per day
+
+    That is a 520x reduction, and it is the *only* reduction that works. All three of
+    the alternatives were tested and are traps:
+
+      * ``&.time=first&.lat=first&.lon=first`` -- silently a **no-op**. Byte-identical
+        690,813 B response. This one is nasty, because it looks like it is doing
+        something and the examples online use it.
+      * ``&time=...&latitude=...`` constraint variables -- HTTP 400: *"In a griddap
+        query, '&' must be followed by a .griddap server variable."*
+      * strides inside the index, ``[(0):(1):(29)]`` -- HTTP 400: *"For variable
+        analysed_sst axis#0=time Constraint=..."*
+
+    So: **shrink the box.** ERDDAP's griddap DSL has no stride and no constraint
+    variables, and the server-side directives people copy around are decorative.
     """
     lat0, lat1, lon0, lon1 = box
+    if point:
+        # keep the first cell of the box; a degenerate range is a valid single-cell query
+        lat1, lon1 = lat0, lon0
     index = f"[({start}):({end})][({lat0}):({lat1})][({lon0}):({lon1})]"
-    server = {"time": "first", "lat": "first", "lon": "first"} if one_per_day else None
-    return erddap(ERDDAP, SST_VAR, index, fmt=fmt, server=server)
+    return erddap(ERDDAP, SST_VAR, index, fmt=fmt)
 
 
 def sst_csv(**kw) -> str:
@@ -79,7 +96,7 @@ def sst_csv(**kw) -> str:
 
 
 def sst_nc(**kw) -> str:
-    return sst_url(fmt="nc", one_per_day=False, **kw)
+    return sst_url(fmt="nc", **kw)
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +218,8 @@ def manifest() -> list[tuple[str, str, dict | None]]:
     would be the bug this design exists to prevent.
     """
     items: list[tuple[str, str, dict | None]] = [
-        ("erddap/sst-csv", sst_csv(), None),
+        ("erddap/sst-box-csv", sst_csv(), None),
+        ("erddap/sst-point-csv", sst_csv(point=True), None),
         ("erddap/sst-nc", sst_nc(), None),
         ("gcs/list-sites", GCS_API,
          gcs_list_params(f"sanctsound/products/sound_level_metrics/{NCEI_SITE}/", "/", 200)),

@@ -129,7 +129,7 @@ def start_db() -> None:
             die(
                 f"host port {DB_PORT} is already in use",
                 "You probably have a local PostgreSQL. Either stop it, or pick another:\n"
-                f"    uv run workshop-setup --port 5433\n"
+                "    uv run workshop-setup --port 5433\n"
                 "The port is read from OCEAN_SIM_PORT by the database and by every\n"
                 "script that connects, so this stays consistent.",
             )

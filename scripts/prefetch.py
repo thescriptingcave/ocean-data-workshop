@@ -42,11 +42,11 @@ def main() -> int:
     t0 = time.time()
     for label, url, params in items:
         try:
-            r = get(url, params, quiet=True)
+            r = get(url, params, refresh=True, quiet=True)
             total_bytes += len(r.content)
             print(f"  ok   {label:24} {len(r.content):>10,} B  {r.describe()}")
             ok += 1
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(f"  FAIL {label:24} {type(exc).__name__}: {str(exc)[:70]}")
             failed.append(label)
 

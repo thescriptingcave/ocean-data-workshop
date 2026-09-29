@@ -111,14 +111,19 @@ def get(
     """GET a URL, falling back to the cached response if the network fails.
 
     ``params`` is part of the cache key, so two different queries never collide.
-    ``refresh=True`` forces the network even when a cache entry exists -- use it when
-    teaching a query change and you want to prove the change did something.
+
+    ``refresh=True`` refuses to fall back to cache and raises instead. That is for the
+    prefetcher, which must never mistake a stale cache entry for a fresh download. In a
+    notebook you want the fallback; before a workshop you want the truth.
     """
     CACHE.mkdir(parents=True, exist_ok=True)
     k = _key(url, params)
     bin_p, meta_p = _paths(k)
 
-    if not refresh and not OFFLINE:
+    if OFFLINE:
+        reason = "offline mode (OCEAN_SIM_OFFLINE=1)"
+    else:
+        reason = ""
         try:
             import requests
 
@@ -145,8 +150,11 @@ def get(
             )
         except Exception as exc:
             reason = f"{type(exc).__name__}: {exc}"
-    elif OFFLINE:
-        reason = "offline mode (OCEAN_SIM_OFFLINE=1)"
+
+        if refresh:
+            raise RuntimeError(
+                f"refresh=True and the fetch failed:\n  {url}\n  as: {reason}"
+            )
 
     # --- fall back to cache -------------------------------------------------
     if not bin_p.exists():
