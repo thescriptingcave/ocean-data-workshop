@@ -5,6 +5,30 @@ An ocean **data workbench** for learning time-series SQL and ML on real public d
 Not a simulator. For observational data the measurements *are* the answer — the job is
 to interpret them, not to predict them.
 
+## Start here
+
+**→ [`GETTING_STARTED.md`](GETTING_STARTED.md)** — from nothing to running, ~85 seconds
+**→ [`GLOSSARY.md`](GLOSSARY.md)** — every term used, defined
+**→ [`notebooks/README.md`](notebooks/README.md)** — the ten-notebook workshop
+
+## The data retrieval workshop
+
+Ten notebooks on getting real ocean data out of public APIs — the parts that are
+documented badly, and the parts that are not documented at all.
+
+```bash
+uv run workshop-setup          # one command, macOS + Linux + Windows
+uv run jupyter lab notebooks/
+```
+
+Organised by **access pattern** rather than by dataset, because the patterns transfer and
+the datasets do not. Ends with a result: across 30 frequency bands, wind's correlation
+with underwater noise is 0.204 below 500 Hz and 0.699 above 2 kHz, and every one of the 9
+bands that fails a block-bootstrap significance test is below 200 Hz.
+
+**33 traps** found while building it, catalogued in Notebook 09 — **32 reproduced against
+live services**, and not one of them documented anywhere.
+
 ## Phase -1: data access audit
 
 The first phase answers one question about every candidate dataset: **can we get it, and

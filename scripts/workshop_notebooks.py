@@ -2663,6 +2663,16 @@ print("  cache        :", "warm" if _fetch.CACHE.exists() and any(_fetch.CACHE.g
 print("  offline mode :", _fetch.OFFLINE)
 '''),
         md("""
+## Two documents to have open
+
+* **`GETTING_STARTED.md`** — from nothing to running: prerequisites, the one setup
+  command, a measured timing table, and a troubleshooting table built from failures that
+  actually happened.
+* **`GLOSSARY.md`** — every term used in these notebooks, defined. It covers both
+  vocabularies that meet here: ocean science, which most of this room knows, and data
+  plumbing, which is what the workshop is about. The expensive misunderstandings happen
+  at the boundary.
+
 ## How to run this
 
 Notebooks are committed **with output**, so you can read them cold, days later, having

@@ -7,6 +7,11 @@ Built around real data from **Monterey Bay, California**: sea surface temperatur
 ERDDAP, 30-band underwater sound from NOAA's passive acoustic archive, wind from an NDBC
 buoy, temperature/salinity/currents from GLORYS, and T/S profiles from an Argo float.
 
+## Also read
+
+- **[`../GETTING_STARTED.md`](../GETTING_STARTED.md)** — from nothing to running
+- **[`../GLOSSARY.md`](../GLOSSARY.md)** — every term used, defined
+
 ## Run it
 
 ```bash
