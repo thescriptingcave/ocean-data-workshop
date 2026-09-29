@@ -27,5 +27,6 @@ __pycache__/
 .DS_Store
 probes/RESULTS.jsonl
 
-# gate figures are regenerable
-figures/
+# figures are regenerable from scripts/; keep the HTML so they are
+# viewable without rerunning anything, but ignore the matplotlib PNGs
+figures/*.png
