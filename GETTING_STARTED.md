@@ -17,8 +17,13 @@ says so.
 | **Disk** | ~200 MB free | Python env, ~15 MB of data, 6 MB of cache |
 | **Time** | 5 min to set up, 2h40 of workshop | compute time is 27 s; the rest is discussion |
 
-A free **Copernicus Marine** account is optional. It unlocks Notebook 05; the notebook
-detects its absence and teaches what it can without it. Everything else is anonymous.
+A free **Copernicus Marine** account is optional. It unlocks Notebook 05 and the ocean
+profile (temperature, salinity, currents).
+
+**Verified working without one.** On a machine with no account: the three anonymous
+sources load, all ten notebooks run, and Notebook 08's result is unaffected — it joins
+wind to acoustics, and neither needs an account. `setup` says so explicitly rather than
+failing, and points at the free registration. Nothing else needs a login.
 
 ### If you do not have Python
 
@@ -152,7 +157,8 @@ been rehearsed end to end yet — treat it as untested.
 | `port is already allocated` | local PostgreSQL on 5432 | `uv run workshop-setup --port 5433` |
 | `container name is already in use` | another checkout of this repo | `OCEAN_SIM_PROJECT=$(basename $PWD) uv run workshop-setup --port 5433` |
 | `Docker is installed but the daemon is not responding` | Docker Desktop still starting | wait for it, then re-run |
-| `No cached copy and no working network` | first run, and the network failed | re-run `uv run python scripts/prefetch.py` on a working network |
+| `No cached copy and no working network` | no cache archive and the network failed | the archive ships with the repo; if you deleted it, re-run `uv run python scripts/prefetch.py` |
+| `ocean_profile_daily 0 <- empty` | no Copernicus account | expected. Everything else loaded; Notebook 08 still works |
 | `No module named 'ocean_sim...'` | project not installed | `uv sync` |
 | Every call takes exactly the timeout | **IPv6 without an IPv6 route** | already handled by the helper; if you see it in your own code, force IPv4 — see Notebook 01 |
 | Kernel not found in Jupyter | kernelspec not registered | `uv run python -m ipykernel install --user --name python3` |
