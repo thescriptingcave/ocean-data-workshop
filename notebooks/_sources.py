@@ -221,8 +221,27 @@ def ndbc_url(station: str = WIND_STATION, year: int = 2019) -> str:
 # ---------------------------------------------------------------------------
 # 5. Credentialed API -- Copernicus Marine (Class C, the only one that needs an account)
 # ---------------------------------------------------------------------------
-GLORYS_DATASET = "GLOBAL_MULTIYEAR_PHY_001_030"
-COPERNICUS_HOME = "https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_PHY_001_030/description"
+# The CMEMS *product-code* form, which is what the CLI actually accepts.
+#
+# The product page calls this product "GLOBAL_MULTIYEAR_PHY_001_030", and that ID
+# looks authoritative. copernicusmarine 2.5.0 does NOT accept it -- verified against
+# the live service, both forms, same credentials:
+#
+#     GLOBAL_MULTIYEAR_PHY_001_030           -> "Dataset not found"
+#     cmems_mod_glo_phy_my_0.083deg_P1D-m    -> 200, 1 file downloaded
+#
+# So the human-facing Product ID and the ID the CLI wants are different strings. It
+# was already right in src/ocean_sim/config.py, and this module had it wrong.
+#
+# Imported rather than repeated, so the two cannot drift -- which is exactly how they
+# drifted in the first place.
+from ocean_sim.config import GLORYS_DATASETS  # noqa: E402
+
+GLORYS_DATASET = GLORYS_DATASETS["daily"]
+
+# The product page, for humans. The two IDs above are not interchangeable.
+GLORYS_PRODUCT_PAGE = "https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_PHY_001_030/description"
+COPERNICUS_HOME = GLORYS_PRODUCT_PAGE
 
 
 # ---------------------------------------------------------------------------

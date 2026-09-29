@@ -136,3 +136,20 @@ def describe() -> str:
         line = "  credentials: NONE. Everything else still works."
     warn = check_permissions()
     return line + (f"\n  !! {warn}" if warn else "")
+
+
+def child_env(extra: dict | None = None) -> dict:
+    """The environment for a ``copernicusmarine`` subprocess, with credentials loaded.
+
+    Exposed because a notebook that builds its own ``subprocess.run`` needs the same
+    treatment as ``glorys.fetch``. That omission was a real bug: ``load_db.py`` worked
+    while Notebook 05 failed with "Dataset not found", because the loader went through
+    this module and the notebook did not.
+
+    The variables are *not* printed. On a shared machine they land in the child's
+    environment, which ``ps -E`` can read; that is inherent to the CLI's own
+    ``COPERNICUSMARINE_SERVICE_PASSWORD`` support and not something this module adds.
+    """
+    load()
+    base = {**os.environ, **(extra or {})}
+    return base

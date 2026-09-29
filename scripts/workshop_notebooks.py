@@ -1974,9 +1974,12 @@ TRAPS: list[tuple] = [
     ("05 Copernicus", "advertised variable count is reported as 0",
      "a correct dataset that looks empty",
      "do not trust the summary; request variables explicitly", "live"),
-    ("05 Copernicus", "'Dataset not found' can mean a stale credential",
-     "a live Product ID reported as missing; advises you to check the ID",
-     "check the product page (no login) before editing dataset IDs; re-run login", "live"),
+    ("05 Copernicus", "the human Product ID and the CLI dataset id differ",
+     "'Dataset not found' for GLOBAL_MULTIYEAR_PHY_001_030, which is live",
+     "the CLI wants the CMEMS product code cmems_mod_glo_phy_my_0.083deg_P1D-m", "live"),
+    ("05 Copernicus", "the error tells you to check the dataset id",
+     "the id looks authoritative, so you start editing a correct one",
+     "diff the failing argv against a working one before theorising", "live"),
     ("05 Copernicus", "login env vars are COPERNICUSMARINE_SERVICE_USERNAME/PASSWORD",
      "COPERNICUS_USERNAME / COPERNICUS_PASSWORD are silently ignored",
      "read `copernicusmarine login --help` for the real names", "live"),
@@ -2147,7 +2150,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from ocean_sim.credentials import DOTENV, describe, load
+from ocean_sim.credentials import DOTENV, child_env, describe, load
 
 has_cli = shutil.which("copernicusmarine") is not None
 creds = load()
@@ -2267,9 +2270,21 @@ print("  that is the difference between a 30-second call and a stalled workshop.
         code('''
 if READY:
     print("  running the live subset -- this is the slow cell in the notebook...")
-    r = subprocess.run(subset + ["--overwrite"], capture_output=True, text=True, timeout=1800)
+    # env=child_env() is NOT optional. The CLI reads credentials from the environment,
+    # and a plain subprocess.run inherits this process's environment -- which does not
+    # have them until child_env() loads .env. Without it the request fails with
+    # "Dataset not found", which reads like a wrong dataset id and is not.
+    r = subprocess.run(subset + ["--overwrite"], capture_output=True, text=True,
+                       timeout=1800, env=child_env())
     print("  exit:", r.returncode)
-    print((r.stdout or r.stderr)[-600:])
+    out = (r.stdout or r.stderr or "")
+    print(out[-600:])
+    if r.returncode != 0 and "not found" in out.lower():
+        print()
+        print("  'Dataset not found' means the dataset-id STRING was wrong, not that")
+        print("  your account is. The form the CLI accepts is the CMEMS product code:")
+        print(f"    {S.GLORYS_DATASET}")
+        print("  and you must pass env=child_env() so the CLI receives your credentials.")
 else:
     print("  SKIPPED -- no credentials on this machine.")
     print()
@@ -2279,36 +2294,46 @@ else:
 '''),
 
         md("""
-### ⚠️ Trap — "Dataset not found" usually means your login is stale, not that the ID is wrong
+### ⚠️ Trap — the Product ID and the dataset id are different strings
 
-This one cost real time and the error message actively misleads. A request with a
-perfectly valid Product ID comes back:
+This one produced a long and completely wrong detour, so it is worth telling properly.
+
+Copernicus calls this product **GLOBAL_MULTIYEAR_PHY_001_030** on its website, and that
+is the string you find by searching. `copernicusmarine` does **not** accept it. Both forms
+were run against the live service, same credentials, same day:
+
+| `--dataset-id` | result |
+|---|---|
+| `GLOBAL_MULTIYEAR_PHY_001_030` | `ERROR - Dataset not found` |
+| `cmems_mod_glo_phy_my_0.083deg_P1D-m` | 200, file downloaded |
+
+The working form is the CMEMS **product code**, and it is already right in
+`src/ocean_sim/config.py`. A constant written separately in `_sources.py` had it wrong —
+so the loader worked while the notebook did not, from the same repository, on the same
+machine, with the same credentials.
+
+### ⚠️ Trap — and the error message sends you the wrong way
 
 ```
 ERROR - Dataset not found: GLOBAL_MULTIYEAR_PHY_001_030
 Please check that the dataset exists and the input datasetID is correct.
 ```
 
-The advice — check your dataset ID — is wrong. Verified while writing this notebook:
+That advice is confidently wrong. I read it as a broken login, wrote it up as a trap
+about stale credentials, and then tried four more dataset IDs before going back to read
+the code that was already working.
 
-| check | result |
-|---|---|
-| `GLOBAL_MULTIYEAR_PHY_001_030` on the Copernicus product page | **valid**, last metadata update Nov 2023, coverage to Jun 2026 |
-| DNS for `data.marine.copernicus.eu` | resolves |
-| HTTPS to that host | HTTP 200 |
-| the CLI | "Dataset not found" |
+Two things to take from it:
 
-So the dataset is there, the network is fine, and the request still fails. What has
-actually happened is that the stored credential is no longer accepted — and because the
-CLI cannot authenticate, it cannot list what it is allowed to see, so it reports the
-empty result as a missing dataset.
+1. **`Dataset not found` is a statement about the string you passed, not about the
+   product.** Check the failing command's own argv against a *working* one before
+   theorising about your account.
+2. **When two entry points disagree, diff them.** `glorys.fetch` succeeded while the
+   notebook failed, and the difference was one argument. That comparison would have taken
+   a minute and would have been conclusive.
 
-**`Dataset not found` from a credentialed API is a statement about your account until you
-have ruled out the dataset.** Check the product page (free, no login) before you start
-editing dataset IDs — as I did, which cost a detour through four plausible alternatives.
-
-The other way to be wrong here: `login` reads these environment variables, and the names
-are not the obvious ones.
+The one thing I got right by accident, and which is still true: `login` reads these
+environment variables, and the names are not the obvious ones.
 
 ```
 COPERNICUSMARINE_SERVICE_USERNAME
