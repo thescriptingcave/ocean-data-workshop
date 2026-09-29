@@ -129,7 +129,8 @@ def session():
 
             meta = json.loads(meta_p.read_text()) if meta_p.exists() else {}
             ts = float(meta.get("ts", 0.0))
-            _warn_cached(request.url, reason, meta, time.time() - ts if ts else None)
+            age = (time.time() - ts) if ts else None
+            _warn_cached(request.url, reason, meta, age)
 
             # Rebuild a genuine Response so callers keep the whole requests API.
             cached = requests.Response()
@@ -139,6 +140,11 @@ def session():
             cached.encoding = meta.get("encoding") or "utf-8"
             cached.url = request.url
             cached.request = request
+            # Mark the provenance. describe() reads this, and without it the prefetch
+            # reported "LIVE" for every entry even with OCEAN_SIM_OFFLINE=1 -- an
+            # output that lies about where the data came from is worse than no output.
+            cached._from_cache = True
+            cached._cached_age = age
             return cached
 
     sess = CachedSession()
@@ -151,9 +157,16 @@ def session():
 
 
 def describe(r) -> str:
-    """One line about a response, for logging. Handy when sweeping many URLs."""
-    origin = "CACHED" if getattr(r, "_from_cache", False) else "LIVE"
-    return f"{origin}  {len(r.content) / 1024:,.1f} KB  HTTP {r.status_code}"
+    """One line about a response, for logging. Handy when sweeping many URLs.
+
+    Reports CACHED when the response came off disk, which is the thing you want to know
+    when you are deciding whether the workshop can survive without a network.
+    """
+    if getattr(r, "_from_cache", False):
+        age = getattr(r, "_cached_age", None)
+        stamp = f", {age / 3600:.0f} h old" if age is not None else ""
+        return f"CACHED  {len(r.content) / 1024:,.1f} KB  HTTP {r.status_code}{stamp}"
+    return f"LIVE    {len(r.content) / 1024:,.1f} KB  HTTP {r.status_code}"
 
 
 def erddap(base: str, var: str, index: str, *, fmt: str = "csv", server: dict | None = None):

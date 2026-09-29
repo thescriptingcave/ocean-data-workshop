@@ -17,9 +17,18 @@ Ten notebooks on getting real ocean data out of public APIs — the parts that a
 documented badly, and the parts that are not documented at all.
 
 ```bash
-uv run workshop-setup          # one command, macOS + Linux + Windows
+make                            # setup, then open Jupyter Lab
+```
+
+Or without `make`:
+
+```bash
+uv run workshop-setup           # one command, macOS + Linux + Windows
 uv run jupyter lab notebooks/
 ```
+
+`make help` lists the rest: `make test`, `make check` (every notebook with the network
+forbidden), `make fresh` (clone to a temp dir and run setup from nothing).
 
 Organised by **access pattern** rather than by dataset, because the patterns transfer and
 the datasets do not. Ends with a result: across 30 frequency bands, wind's correlation
