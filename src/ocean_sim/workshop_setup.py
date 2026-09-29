@@ -72,6 +72,24 @@ def die(msg: str, hint: str = "") -> None:
     sys.exit(1)
 
 
+def run_visible(cmd: list[str], *, timeout: int = 3600) -> None:
+    """Run a long step with its output visible.
+
+    The data load is the slowest step and the one most likely to partially fail. It used
+    to run with captured output, which meant an attendee whose ocean profile was skipped
+    for want of a Copernicus account saw nothing between two progress headings and had no
+    way to tell that half their data was missing. Stream it.
+    """
+    print(f"  $ {' '.join(str(c) for c in cmd)}")
+    proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True)
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        print(f"  {line.rstrip()}")
+    if proc.wait(timeout=timeout) != 0:
+        die(f"`{' '.join(str(c) for c in cmd)}` failed")
+
+
 def run(cmd: list[str], *, timeout: int = 1800, check: bool = True,
         quiet: bool = False) -> subprocess.CompletedProcess:
     """Run a command. No shell=True anywhere: the arguments differ per platform and a
@@ -185,7 +203,7 @@ def apply_schema() -> None:
 def load_data() -> None:
     step(4, 5, "Loading data")
     warn("first run downloads ~15 MB and takes a few minutes. Later runs are near-instant.")
-    run(["uv", "run", "python", "scripts/load_db.py"], timeout=3600)
+    run_visible(["uv", "run", "python", "scripts/load_db.py"])
 
 
 def prefetch() -> None:
@@ -199,7 +217,7 @@ def prefetch() -> None:
 
     warn("no cache archive -- fetching over the network")
     warn("if this fails the notebooks cannot be guaranteed to run offline")
-    run(["uv", "run", "python", "scripts/prefetch.py"], timeout=3600)
+    run_visible(["uv", "run", "python", "scripts/prefetch.py"])
 
 
 # ---------------------------------------------------------------------------
