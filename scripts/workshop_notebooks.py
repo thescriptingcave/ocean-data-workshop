@@ -977,18 +977,23 @@ confusing: the path that lists is not the path that fetches.
 wrong = S.ncei_file_url("tol_1h", "01").replace("/data/", "/")
 print("  wrong URL:", wrong.rsplit("/", 1)[-1], "at the wrong level")
 print()
-# refresh=True on purpose: this cell exists to show a *live* failure, so falling back
-# to a cache entry would defeat it. That also means it cannot run offline.
+# This cell exists to show a *live* failure, so it must not fall back to a cached
+# response -- a cache hit would print a success and prove nothing. There is no
+# `refresh=` argument on a real requests.Session, so the way to say it is to bypass the
+# caching session: a plain requests.get cannot read the cache at all.
 if _fetch.OFFLINE:
     print("  skipped -- offline mode. The server's response is reproduced below.")
     print("   HTTP 404")
     print("   <Error><Code>NoSuchKey</Code><Message>The specified key does not exist.")
 else:
+    import requests
+
     try:
-        http.get(wrong, refresh=True)
-    except RuntimeError as exc:
-        for line in str(exc).splitlines()[:4]:
-            print("   ", line)
+        requests.get(wrong, timeout=(10, 30)).raise_for_status()
+        print("   unexpectedly succeeded")
+    except requests.HTTPError as exc:
+        print("   ", f"HTTP {exc.response.status_code}:",
+              exc.response.text.strip()[:88])
 print()
 print("  Notice: the HTTP status is 404, but the payload says NoSuchKey. Nothing in")
 print("  the status code distinguishes 'you are not allowed' from 'that is not the")
