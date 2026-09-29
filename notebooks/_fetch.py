@@ -197,15 +197,30 @@ def erddap(base: str, var: str, index: str, *, fmt: str = "csv", server: dict | 
     return q
 
 
-def expect(label: str, got, want, tol: float = 0.0) -> None:
+def expect(label: str, got, want, tol: float = 0.0, rtol: float = 0.0) -> None:
     """Assert a value is what the notebook said it would be, loudly.
 
     Included because the failure mode that costs an afternoon is not a crash -- it is a
     200 OK containing plausible nonsense. Every notebook states an expectation up front
     and checks it at the end, so a wrong answer is visible in three seconds rather than
     after someone has plotted it.
+
+    ``tol`` is an **absolute** allowance and ``rtol`` is a **fraction of** ``want``. They
+    are separate arguments on purpose: a single ``tol=0.01`` that silently means
+    "within one hundredth of a unit" was a footgun, and it did fail silently for exactly
+    that reason -- ``abs(133960 - 134020) = 60``, which is not <= 0.01.
+
+    Use ``rtol`` for anything a live service generates (byte counts, timestamps, ids) and
+    ``tol`` for anything you control.
     """
-    ok = abs(float(got) - float(want)) <= tol if tol else got == want
+    # Only coerce to float when a tolerance is actually being applied. `want` is
+    # legitimately a list or a string in several assertions, and float() on those is a
+    # TypeError rather than a comparison.
+    if rtol or tol:
+        diff = abs(float(got) - float(want))
+        ok = diff <= (abs(float(want)) * rtol if rtol else tol)
+    else:
+        ok = got == want
     print(f"  {'ok ' if ok else '!! '} {label}: got {got!r}, expected {want!r}")
     if not ok:
         raise AssertionError(

@@ -26,7 +26,7 @@ NB_DIR    := notebooks
 PORT_ARGS := $(if $(filter 5432,$(PORT)),,--port $(PORT))
 
 .DEFAULT_GOAL := all
-.PHONY: all setup lab notebook notebooks test check check-notebooks check-independence \
+.PHONY: all setup lab lab-offline notebook notebooks test check check-notebooks check-independence \
         lint unit fresh clean clean-cache help deps kernel prefetch db shell
 
 ## all: set up, then open Jupyter Lab
@@ -48,6 +48,13 @@ kernel:
 ## lab: open Jupyter Lab on the notebooks
 lab: kernel
 	@$(UVRUN) jupyter lab $(NB_DIR)/
+
+## lab-offline: open Jupyter Lab with the network forbidden
+##
+## The network-is-bad case is also one command. Everything is served from the cache, and
+## each request prints a warning saying so -- the numbers are real, just not new.
+lab-offline: kernel
+	@OCEAN_SIM_OFFLINE=1 $(UVRUN) jupyter lab $(NB_DIR)/
 
 ## notebook: execute every notebook, saving output -- the supported way to run them
 notebook:

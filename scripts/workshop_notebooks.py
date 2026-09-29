@@ -842,7 +842,11 @@ print("  Whether that matters depends on the question, which is the next noteboo
 '''),
 
         code('''
-_fetch.expect("netCDF bytes", len(nc.content), 134020)
+# A tolerance, not an exact count. ERDDAP's netCDF embeds generation timestamps, so
+# the same query returns 133,960 or 134,020 bytes depending on when you asked. An
+# exact assertion is a time bomb: it fails for a reason that has nothing to do with
+# the data being wrong. 1% still catches a truncated download or a wrong format.
+_fetch.expect("netCDF bytes", len(nc.content), 134020, rtol=0.01)
 _fetch.expect("time steps", int(ds.sizes["time"]), 30)
 _fetch.expect("latitude points", int(ds.sizes["latitude"]), 23)
 _fetch.expect("longitude points", int(ds.sizes["longitude"]), 23)
@@ -2870,51 +2874,27 @@ lesson:
 Step 1 and step 6 are the ones people skip, and they are the difference between "I got
 some data" and "I got **the right** data".
 """),
-        md("""
+        md(f"""
 ## Setup, if you have not run it
+
+One command, and it does the lot -- dependencies, database, data, cache, kernel, and
+then opens these notebooks:
+
+```bash
+make
+```
+
+If the network is bad, `make lab-offline` is the same thing with the network forbidden.
+
+If you would rather not use `make`, these are the two steps it runs:
 
 ```bash
 uv run workshop-setup
-```
-
-One command, and it is the same on macOS, Linux and Windows — Python rather than shell
-specifically so a `.sh` and a `.bat` cannot drift apart. It checks Docker, starts
-PostgreSQL, waits for it to be *healthy*, applies the schema, loads the data, and warms
-the API cache.
-
-Then:
-
-```bash
 uv run jupyter lab notebooks/
 ```
-"""),
-        code('''
-# Prove the environment is actually ready, rather than assuming it.
-import shutil
-import subprocess
 
-print("  docker       :", "yes" if shutil.which("docker") else "NO -- needed for Notebook 08")
-try:
-    v = subprocess.run(["docker", "compose", "version"], capture_output=True, text=True, timeout=20)
-    print("  compose      :", "yes" if v.returncode == 0 else "no")
-except Exception:
-    print("  compose      : not runnable")
-print("  python       :", sys.version.split()[0])
-
-import importlib
-for m in ("pandas", "numpy", "xarray", "matplotlib", "seaborn", "gsw", "psycopg"):
-    try:
-        importlib.import_module(m)
-        print(f"  {m:12}: ok")
-    except ImportError:
-        print(f"  {m:12}: MISSING")
-
-print()
-print("  cache        :", "warm" if _fetch.CACHE.exists() and any(_fetch.CACHE.glob("*.bin"))
-      else "empty -- run scripts/prefetch.py")
-print("  offline mode :", _fetch.OFFLINE)
-'''),
-        md(f"""
+Both work the same on macOS, Linux and Windows. `make setup` and `workshop_setup.py` are
+Python rather than shell, specifically so a `.sh` and a `.bat` cannot drift apart.
 ## Two documents to have open
 
 * **`GETTING_STARTED.md`** — from nothing to running: prerequisites, the one setup
@@ -2936,7 +2916,7 @@ response and says so loudly. The whole workshop was verified with the network sw
 off:
 
 ```bash
-OCEAN_SIM_OFFLINE=1 uv run jupyter lab notebooks/
+make lab-offline
 ```
 
 **Fast lane.** If you are comfortable with raw HTTP, notebooks 02, 03, 05 and 06 are

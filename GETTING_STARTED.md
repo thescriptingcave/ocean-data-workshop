@@ -75,27 +75,13 @@ git clone <repository-url> ocean-sim
 cd ocean-sim
 ```
 
-## 3. Set up
+## 3. Set up and open Jupyter — one command
 
 ```bash
-make setup          # or: uv run workshop-setup
+make
 ```
 
-`make` is the short path -- it runs this and then opens Jupyter. If you have never used
-it: a build tool, already installed with the Xcode command line tools on macOS and
-available from your package manager on Linux and Windows.
-
-| | |
-|---|---|
-| `make lab` | open Jupyter Lab |
-| `make notebook` | run every notebook top to bottom, saving output |
-| `make test` | notebooks, cell-independence report, unit tests, lint |
-| `make check` | every notebook with the **network forbidden** -- the offline guarantee |
-| `make fresh` | clone to a temp dir and run setup from nothing |
-| `make db` | reload the data |
-| `PORT=5433 make setup` | use a different database port |
-
-That one command:
+That is the whole thing. It:
 
 1. checks Docker is installed and running
 2. starts PostgreSQL 17 + TimescaleDB and **waits for it to be healthy**
@@ -103,13 +89,47 @@ That one command:
 4. downloads ~15 MB of real data and loads it
 5. warms the API cache so the notebooks do not depend on the network
 6. registers the Jupyter kernel and checks that `jupyter lab` actually runs
+7. opens Jupyter Lab on `notebooks/`
 
-Re-run it any time — every stage is idempotent.
+Typical time from a fresh clone: **~85 seconds**, about 15 MB of downloads. Re-run it
+any time — every stage is idempotent.
+
+`make` is a build tool: already installed with the Xcode command line tools on macOS,
+and available from your package manager on Linux and Windows. If you would rather not
+use it, the same two steps are:
+
+```bash
+uv run workshop-setup
+uv run jupyter lab notebooks/
+```
+
+### If the network is bad
+
+```bash
+make lab-offline
+```
+
+Also one command. Everything is served from the cache and each request prints a warning
+that it is doing so — the numbers are real, just not new.
+
+### The rest of the targets
+
+`make help` lists them all. The ones worth knowing:
+
+| | |
+|---|---|
+| `make lab` | open Jupyter Lab again, without redoing setup |
+| `make notebook` | run every notebook top to bottom, saving output |
+| `make test` | notebooks, cell-independence report, unit tests, lint |
+| `make check` | every notebook with the **network forbidden** — the offline guarantee |
+| `make fresh` | clone to a temp dir and run setup from nothing |
+| `make db` | reload the data |
+| `PORT=5433 make` | use a different database port |
 
 ### Already have PostgreSQL on port 5432?
 
 ```bash
-uv run workshop-setup --port 5433
+PORT=5433 make
 ```
 
 The port is read from `OCEAN_SIM_PORT` by the database *and* by every script that
@@ -124,11 +144,8 @@ defaults to the checkout's directory name. Add `--port` as well if both are on 5
 
 ## 4. Verify
 
-```bash
-uv run jupyter lab notebooks/
-```
-
-Open `00_orientation.ipynb` and run all cells.
+In Jupyter, open `00_orientation.ipynb` and run all cells. The last cell asserts the
+environment is ready and prints **"Environment is ready. Start with 01."**
 
 Jupyter Lab prints a URL that contains a **token**, and opens your browser at it. The
 token is in the terminal you launched from — so keep that terminal open. If you ever land
@@ -201,8 +218,8 @@ been rehearsed end to end yet — treat it as untested.
 
 | symptom | cause | fix |
 |---|---|---|
-| `port is already allocated` | local PostgreSQL on 5432 | `uv run workshop-setup --port 5433` |
-| `container name is already in use` | another checkout of this repo | `OCEAN_SIM_PROJECT=$(basename $PWD) uv run workshop-setup --port 5433` |
+| `port is already allocated` | local PostgreSQL on 5432 | `PORT=5433 make` |
+| `container name is already in use` | another checkout of this repo | `OCEAN_SIM_PROJECT=$(basename $PWD) PORT=5433 make` |
 | `Docker is installed but the daemon is not responding` | Docker Desktop still starting | wait for it, then re-run |
 | `No cached copy and no working network` | no cache archive and the network failed | the archive ships with the repo; if you deleted it, re-run `uv run python scripts/prefetch.py` |
 | `ocean_profile_daily 0 <- empty` | no Copernicus account | expected. Everything else loaded; Notebook 08 still works |
