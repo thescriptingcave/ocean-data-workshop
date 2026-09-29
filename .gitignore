@@ -29,6 +29,10 @@ __pycache__/
 # prefetched API responses -- real data, but regenerable, and large
 notebooks/.cache/
 # scratch files the notebooks write into the working directory
+# notebooks/05 subsets GLORYS into notebooks/data/glorys -- downloaded data,
+# never source
+notebooks/data/
+
 # NOTE: notebooks/cache-archive.tar.gz is deliberately NOT ignored. It is
 # committed, and it is what makes the workshop run with no network at all.
 notebooks/_*.nc

@@ -285,6 +285,13 @@ GLOSSARY.md           every term used, defined
 
 ---
 
+## Licence
+
+No licence has been chosen yet, which means "all rights reserved" by default — nobody may
+legally reuse this. If you are publishing it, add a `LICENSE` file and a `license` field
+in `pyproject.toml`. The code is original; the *data* it fetches is public and belongs to
+NOAA, NASA/JPL, Copernicus and the Argo programme, and carries its own terms.
+
 ## Data sources
 
 Nine of the ten sources are **anonymous** — no account, no key, no registration. One

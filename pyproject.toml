@@ -1,7 +1,16 @@
 [project]
 name = "ocean-sim"
 version = "0.1.0"
+description = "A hands-on workshop on retrieving real ocean data from public APIs, and on the traps in doing so."
+readme = "README.md"
 requires-python = ">=3.12"
+keywords = ["oceanography", "data-access", "teaching", "notebooks", "copernicus", "erddap"]
+classifiers = [
+  "Intended Audience :: Education",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Education",
+]
 dependencies = [
     "cmocean>=4.0.3",
     "copernicusmarine>=2.5.0",
@@ -17,12 +26,10 @@ dependencies = [
     "pandas>=3.0.6",
     "plotly>=7.1.0",
     "psycopg[binary]>=3.3.6",
-    "python-dotenv>=1.2.3",
     "requests>=2.34.2",
     "scikit-learn>=1.9.1",
     "scipy>=1.18.1",
     "seaborn>=0.13.2",
-    "soundfile>=0.14.0",
     "xarray>=2026.7.0",
 ]
 

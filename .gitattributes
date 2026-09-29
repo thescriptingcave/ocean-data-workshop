@@ -1,0 +1,23 @@
+# Normalise line endings on checkin, and keep LF on checkout. Matters on Windows,
+# which this project is tested on -- a repo whose notebooks differ only by CRLF
+# produces spurious diffs across every file.
+* text=auto eol=lf
+
+# Text, with a better diff where the tool understands it.
+*.py      text diff=python
+*.md      text
+*.yml     text
+*.toml    text
+*.sql     text
+Makefile  text
+# .ipynb is JSON, so it stays text and diffs usefully. The notebooks are built from
+# Python precisely so they can be reviewed as a diff.
+*.ipynb   text
+
+# Binary. Must never be line-ending-converted, and a diff of them is noise.
+*.nc      binary
+*.nc4     binary
+*.gz      binary
+*.tar.gz  binary
+*.png     binary
+*.ipynb_checkpoints binary

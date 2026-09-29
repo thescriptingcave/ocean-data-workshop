@@ -11,6 +11,9 @@ to interpret them, not to predict them.
 **→ [`GLOSSARY.md`](GLOSSARY.md)** — every term used, defined
 **→ [`notebooks/README.md`](notebooks/README.md)** — the ten-notebook workshop
 
+If you are contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md) — the notebooks are
+generated, do not edit the `.ipynb` files.
+
 ## The data retrieval workshop
 
 Ten notebooks on getting real ocean data out of public APIs — the parts that are

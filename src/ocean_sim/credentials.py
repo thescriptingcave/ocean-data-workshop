@@ -125,7 +125,10 @@ def describe() -> str:
     """A short human-readable summary. Safe to print -- no values."""
     s = load()
     if s["complete"]:
-        via = {"environment": "the environment", ".env": str(s["dotenv_path"])}[
+        # Relative, never absolute. Printing the resolved path put
+        # /Users/<name>/... into committed notebook output, which is not something a
+        # public repository should advertise.
+        via = {"environment": "the environment", ".env": ".env"}[
             s["source"] if s["source"] in ("environment", ".env") else "environment"
         ]
         line = f"  credentials: present, from {via}"
