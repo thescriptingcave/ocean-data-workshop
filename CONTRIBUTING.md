@@ -1,20 +1,5 @@
 # Contributing
 
-## Before you design anything
-
-**[`SKILL.md`](.opencode/skills/ocean-workshop-tiers/SKILL.md)** is the specification
-for the three tiers — what belongs in each, how notebooks are generated, the design
-rules they were built on, and a reference of every data source's verified behaviour.
-
-Read it before adding a notebook, adding a dataset, or deciding which tier an idea
-belongs in. It is written for an AI agent working in this repo, so if you are using one
-it will pick it up on its own; the same document is the right thing for a human to
-read.
-
-The short version: **Workshop Intro** is `beginners/`, **Workshop Intermediate** is
-specified but not yet built, and **Workshop Advanced** is `notebooks/`. They share no
-code and no setup, and each keeps its own dependencies.
-
 ## The one thing to know
 
 **The notebooks are generated. Do not edit the `.ipynb` files.**
