@@ -103,7 +103,7 @@ is overconfident by roughly that factor.
 
 ## The trap table
 
-Notebook 09 lists **33 traps** found while building this material, and **none of them is
+Notebook 09 lists **35 traps** found while building this material, and **none of them is
 in any documentation**. A sample:
 
 | trap | symptom |

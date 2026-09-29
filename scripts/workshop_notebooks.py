@@ -1974,6 +1974,12 @@ TRAPS: list[tuple] = [
     ("05 Copernicus", "advertised variable count is reported as 0",
      "a correct dataset that looks empty",
      "do not trust the summary; request variables explicitly", "live"),
+    ("05 Copernicus", "'Dataset not found' can mean a stale credential",
+     "a live Product ID reported as missing; advises you to check the ID",
+     "check the product page (no login) before editing dataset IDs; re-run login", "live"),
+    ("05 Copernicus", "login env vars are COPERNICUSMARINE_SERVICE_USERNAME/PASSWORD",
+     "COPERNICUS_USERNAME / COPERNICUS_PASSWORD are silently ignored",
+     "read `copernicusmarine login --help` for the real names", "live"),
     ("08 SQL", "Postgres names every avg() result 'avg'",
      "three averages in one SELECT produce duplicate column names",
      "alias every aggregate explicitly", "live"),
@@ -2157,8 +2163,11 @@ else:
     print()
     print("  To set this up (takes a few minutes, and an email verification):")
     print("    1. Register: https://data.marine.copernicus.eu/register")
-    print("    2. pip install copernicusmarine   (already in this project's deps)")
-    print("    3. copernicusmarine login")
+    print("    2. copernicusmarine login")
+    print()
+    print("  `login` is interactive and stores the result in")
+    print(f"  {CRED_DIR}. Nothing in this repository reads a .env, and no")
+    print("  credential is committed -- that is deliberate, not an oversight.")
 '''),
 
         md("""
@@ -2259,6 +2268,46 @@ else:
 '''),
 
         md("""
+### ⚠️ Trap — "Dataset not found" usually means your login is stale, not that the ID is wrong
+
+This one cost real time and the error message actively misleads. A request with a
+perfectly valid Product ID comes back:
+
+```
+ERROR - Dataset not found: GLOBAL_MULTIYEAR_PHY_001_030
+Please check that the dataset exists and the input datasetID is correct.
+```
+
+The advice — check your dataset ID — is wrong. Verified while writing this notebook:
+
+| check | result |
+|---|---|
+| `GLOBAL_MULTIYEAR_PHY_001_030` on the Copernicus product page | **valid**, last metadata update Nov 2023, coverage to Jun 2026 |
+| DNS for `data.marine.copernicus.eu` | resolves |
+| HTTPS to that host | HTTP 200 |
+| the CLI | "Dataset not found" |
+
+So the dataset is there, the network is fine, and the request still fails. What has
+actually happened is that the stored credential is no longer accepted — and because the
+CLI cannot authenticate, it cannot list what it is allowed to see, so it reports the
+empty result as a missing dataset.
+
+**`Dataset not found` from a credentialed API is a statement about your account until you
+have ruled out the dataset.** Check the product page (free, no login) before you start
+editing dataset IDs — as I did, which cost a detour through four plausible alternatives.
+
+The other way to be wrong here: `login` reads these environment variables, and the names
+are not the obvious ones.
+
+```
+COPERNICUSMARINE_SERVICE_USERNAME
+COPERNICUSMARINE_SERVICE_PASSWORD
+```
+
+`COPERNICUS_USERNAME` / `COPERNICUS_PASSWORD` are silently ignored — no error, the
+variables are simply never read. Check `copernicusmarine login --help` rather than
+guessing.
+
 ## 4. Why a fallback ladder is not indecision
 
 GLORYS is the only source for currents, and it is the only one that can fail for a
@@ -2675,8 +2724,10 @@ print("  a plumbing exercise rather than a result.")
 # 00 -- Orientation
 # ===========================================================================
 def nb_00() -> object:
+    n_traps = len(TRAPS)
+    n_live = sum(1 for t in TRAPS if t[4] == "live")
     b = build(
-        md("""
+        md(f"""
 # 00 — Orientation
 
 **Written last, on purpose.** An introduction that describes material which does not
@@ -2839,7 +2890,7 @@ count, a physical range.
 
 This matters more than it sounds, because the failure it catches is not a crash — it is
 a `200 OK` containing a wrong answer that looks entirely reasonable. Notebook 09 lists
-**33 traps** found while building this material, and that habit is what would have
+**{n_traps} traps** found while building this material, and that habit is what would have
 caught most of them in three seconds instead of an afternoon.
 """),
         code('''

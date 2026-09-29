@@ -336,5 +336,5 @@ a physical range.
 
 The failure this catches is not a crash. It is a `200 OK` containing a wrong answer that
 looks entirely reasonable — the only kind of data bug that costs anyone a day. Every
-`expect()` call in the workshop is that habit, and *NB 09* lists the **33 traps** it would
+`expect()` call in the workshop is that habit, and *NB 09* lists the **35 traps** it would
 have caught.

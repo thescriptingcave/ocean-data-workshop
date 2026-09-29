@@ -26,7 +26,7 @@ the datasets do not. Ends with a result: across 30 frequency bands, wind's corre
 with underwater noise is 0.204 below 500 Hz and 0.699 above 2 kHz, and every one of the 9
 bands that fails a block-bootstrap significance test is below 200 Hz.
 
-**33 traps** found while building it, catalogued in Notebook 09 — **32 reproduced against
+**35 traps** found while building it, catalogued in Notebook 09 — **35 reproduced against
 live services**, and not one of them documented anywhere.
 
 ## Phase -1: data access audit
