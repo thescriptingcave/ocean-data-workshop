@@ -256,6 +256,10 @@ def manifest() -> list[tuple[str, str, dict | None]]:
             gcs_list_params(f"{ncei_dataset_dir('tol_1h', dep)}/data/", "", 10),
         ))
         items.append((f"gcs/file-{dep}-tol", ncei_file_url("tol_1h", dep), None))
+    # The directory listing itself. Notebook 04 teaches "the directory is HTML", which
+    # requires actually fetching the HTML -- and it was the one uncached Argo request,
+    # found by running the notebooks offline in a clean clone.
+    items.append(("argo/dirlist", ARGO_DIR, None))
     for key, url in ARGO_FILES.items():
         items.append((f"argo/{key}", url, None))
     items.append((f"ndbc/{WIND_STATION}-2019", ndbc_url(), None))
