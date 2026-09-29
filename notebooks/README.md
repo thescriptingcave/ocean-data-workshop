@@ -16,8 +16,7 @@ buoy, temperature/salinity/currents from GLORYS, and T/S profiles from an Argo f
 
 ```bash
 git clone <this repo> && cd ocean-sim
-uv run workshop-setup
-uv run jupyter lab notebooks/
+make            # setup, then open Jupyter Lab
 ```
 
 One command sets up everything, and it behaves identically on **macOS (Apple silicon),

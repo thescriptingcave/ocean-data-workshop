@@ -78,8 +78,22 @@ cd ocean-sim
 ## 3. Set up
 
 ```bash
-uv run workshop-setup
+make setup          # or: uv run workshop-setup
 ```
+
+`make` is the short path -- it runs this and then opens Jupyter. If you have never used
+it: a build tool, already installed with the Xcode command line tools on macOS and
+available from your package manager on Linux and Windows.
+
+| | |
+|---|---|
+| `make lab` | open Jupyter Lab |
+| `make notebook` | run every notebook top to bottom, saving output |
+| `make test` | notebooks, cell-independence report, unit tests, lint |
+| `make check` | every notebook with the **network forbidden** -- the offline guarantee |
+| `make fresh` | clone to a temp dir and run setup from nothing |
+| `make db` | reload the data |
+| `PORT=5433 make setup` | use a different database port |
 
 That one command:
 
