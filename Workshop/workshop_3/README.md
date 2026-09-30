@@ -69,20 +69,18 @@ This is a **full-day workshop** (6-8 hours) covering:
 - numpy
 - matplotlib
 - seaborn
-- (Optional) PyTorch, notebook 10 only — `make bonus`
+- PyTorch — installed by `make`, for notebook 10
 
-### Notebook 10 needs PyTorch, which is not installed by default
+### Notebook 10 needs PyTorch, which `make` installs
 
-Notebook 10 is a bonus and PyTorch is a ~200 MB download, so it is an opt-in extra rather
-than a setup step — nobody should wait through that before starting. The notebook runs
-either way and prints which case you are in.
+PyTorch is a ~200 MB download and only notebook 10 uses it, but it is a default
+dependency rather than an extra: a second command after `make` is a step people forget,
+and the notebook then prints "not installed" and looks like it worked. One command that
+does everything is worth 200 MB.
 
-```bash
-make bonus              # or: uv sync --extra bonus
-```
-
-Notebooks 02 (classification) and 07 (clustering) cover the same ground with
-scikit-learn, so skipping this costs you nothing the workshop depends on.
+If you would rather not have it, `uv sync` alone leaves notebook 10 failing on
+`import torch` — which is the honest failure. Notebooks 02 (classification) and 07
+(clustering) cover the same ground with scikit-learn.
 
 ## Key Concepts
 

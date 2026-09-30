@@ -3,9 +3,21 @@
     uv run python scripts/build_notebooks.py            # write .ipynb from the definitions
     uv run python scripts/build_notebooks.py --execute  # ...and run them, saving output
 
-Output is committed deliberately. Most attendees read these cold, days later, having not
-attended, and a notebook with no output is a wall of unverified code. With output *and*
-the assertions from Notebook 01, it is a record of what actually happened.
+The .ipynb files are generated and NOT committed. workshop_notebooks.py is the source;
+these are its build products, and `make lab` renders them. They used to be committed
+with their output, on the reasoning that someone reading cold, days later, having not
+attended, wants to see results rather than a wall of unverified code.
+
+That was a real benefit bought at a cost paid by everyone who used the repo rather than
+merely browsed it: running a notebook modified a tracked file, so `git pull` refused and
+asked for a stash -- twice, in one afternoon, for people simply trying to follow the
+instructions. A notebook saved from Jupyter Lab also drifted from its builder, and the
+committed output carried absolute temp paths and kernel PIDs from whichever machine ran
+it last. CI never read those bytes; it re-executed the builders, so the output was a
+snapshot rather than the thing being verified.
+
+--execute still exists and is still worth running locally: it is how you check that all
+twenty-six execute, and it writes the output into the .ipynb you then read in Lab.
 
 One notebook failing does not stop the others -- during the build you want to know
 everything that is broken, not just the first thing.

@@ -2120,12 +2120,8 @@ dependencies = [
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "seaborn" },
-    { name = "xarray" },
-]
-
-[package.optional-dependencies]
-bonus = [
     { name = "torch" },
+    { name = "xarray" },
 ]
 
 [package.dev-dependencies]
@@ -2155,10 +2151,9 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.9.1" },
     { name = "scipy", specifier = ">=1.18.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "torch", marker = "extra == 'bonus'", specifier = ">=2.9.0" },
+    { name = "torch", specifier = ">=2.9.0" },
     { name = "xarray", specifier = ">=2026.7.0" },
 ]
-provides-extras = ["bonus"]
 
 [package.metadata.requires-dev]
 dev = [

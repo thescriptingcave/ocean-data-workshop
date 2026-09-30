@@ -1,7 +1,8 @@
 """Definitions for the workshop notebooks.
 
 Each ``nb_NN`` function returns a built notebook. ``scripts/build_notebooks.py`` writes
-them and ``scripts/execute_notebooks.py`` runs them so the committed output is real.
+them, and ``--execute`` runs them so the output you read is real. The ``.ipynb`` files
+are generated and not committed; ``make lab`` renders them.
 
 Content is organised by **access pattern** rather than by dataset, because the patterns
 transfer to sources none of us have heard of and the datasets do not:
@@ -3078,7 +3079,7 @@ plt.show()
 
 It shows a **strong, frequency-dependent association**. Measured over 313 days:
 
-| | mean \|r\| | bands |
+| | mean abs(r) | bands |
 |---|---|---|
 | 500 Hz and below | **0.204** | 14 |
 | above 2 kHz | **0.699** | 10 |
@@ -3263,9 +3264,9 @@ Python rather than shell, specifically so a `.sh` and a `.bat` cannot drift apar
 
 ## How to run this
 
-Notebooks are committed **with output**, so you can read them cold, days later, having
-not attended. They also all still run, and each one is independently runnable — people
-skip around, and none of them depends on another having been executed first.
+Notebooks are generated from this file, so `make` renders them and you get output by
+running a cell. They are also all independently runnable — people skip around, and none
+of them depends on another having been executed first.
 
 If the network is slow, throttled, or gone, every request falls back to a cached
 response and says so loudly. The whole workshop was verified with the network switched
@@ -4933,58 +4934,46 @@ def nb_ml_10() -> object:
 Optional deep learning examples, for those who want the same classification problem in
 torch rather than scikit-learn.
 
-**PyTorch is not installed by default** — it is a ~200 MB download and this is the last
-of twenty-six notebooks. If the cell below says it is not installed, that is expected and
-nothing is broken; run `make bonus` and re-run this notebook to see the model. Everything
-in workshops 2 and 3 works without it.
+PyTorch is installed by `make`, so this runs with no extra step. Notebooks 02 and 07
+cover the same classification and clustering with scikit-learn, so this one is depth
+rather than a prerequisite for anything else.
 """),
         *ml_preamble(),
         
         code('''
-# PyTorch is optional -- it is a large download and notebook 09 is the last one, so
-# nobody should be waiting on it. Notebooks 02 and 07 do the same three problems with
-# scikit-learn in seconds; this one is here for the people who want to see the
-# equivalent in torch.
-#
-# The ImportError is scoped to the import alone, on purpose. Wrapping the whole cell in
-# try/except ImportError looks harmless and is not: it swallows every error raised after
-# the import as if torch were merely absent, so a typo in the model below reports itself
-# as "PyTorch not installed" and this notebook stayed green for months while broken.
-try:
-    import torch
-    import torch.nn as nn
-except ImportError:
-    print("PyTorch is not installed -- that is fine, this notebook is optional.")
-    print("  install it with:  make bonus")
-    print("  or:               uv sync --extra bonus")
-    print()
-    print("Everything in workshops 2 and 3 runs without it. Notebooks 02 (classification)")
-    print("and 07 (clustering) cover the same ground with scikit-learn.")
-else:
-    print(f"PyTorch {torch.__version__}, CUDA available: {torch.cuda.is_available()}")
+# A plain unguarded import, deliberately. torch is a declared dependency, so if this
+# fails the environment is broken and saying so is more useful than a friendly
+# paragraph. It used to be wrapped in `try: ... except ImportError` to make the notebook
+# survivable without torch -- which worked, and was the problem: the except caught every
+# error raised after the import too, so a NameError in the model below reported itself as
+# "PyTorch not installed" and the notebook stayed green while broken.
+import torch
+import torch.nn as nn
 
-    # The same three-layer stack, in torch. 30 input bands is what the acoustic features
-    # are, and 30 -> 64 -> 32 -> 1 is the shape notebook 02 uses in sklearn.
-    n_bands = 30
+print(f"PyTorch {torch.__version__}, CUDA available: {torch.cuda.is_available()}")
 
-    class DolphinNet(nn.Module):
-        def __init__(self, input_size: int = n_bands):
-            super().__init__()
-            self.fc1 = nn.Linear(input_size, 64)
-            self.fc2 = nn.Linear(64, 32)
-            self.fc3 = nn.Linear(32, 1)
-            self.relu = nn.ReLU()
-            self.dropout = nn.Dropout(0.3)
+# The same three-layer stack, in torch. 30 input bands is what the acoustic features
+# are, and 30 -> 64 -> 32 -> 1 is the shape notebook 02 uses in sklearn.
+n_bands = 30
 
-        def forward(self, x):
-            x = self.dropout(self.relu(self.fc1(x)))
-            x = self.dropout(self.relu(self.fc2(x)))
-            return torch.sigmoid(self.fc3(x))
+class DolphinNet(nn.Module):
+    def __init__(self, input_size: int = n_bands):
+        super().__init__()
+        self.fc1 = nn.Linear(input_size, 64)
+        self.fc2 = nn.Linear(64, 32)
+        self.fc3 = nn.Linear(32, 1)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.3)
 
-    net = DolphinNet()
-    n_params = sum(p.numel() for p in net.parameters())
-    print(f"  DolphinNet: {n_bands} -> 64 -> 32 -> 1, {n_params:,} parameters")
-    print(f"  forward pass on a batch of 4: {tuple(net(torch.zeros(4, n_bands)).shape)}")
+    def forward(self, x):
+        x = self.dropout(self.relu(self.fc1(x)))
+        x = self.dropout(self.relu(self.fc2(x)))
+        return torch.sigmoid(self.fc3(x))
+
+net = DolphinNet()
+n_params = sum(p.numel() for p in net.parameters())
+print(f"  DolphinNet: {n_bands} -> 64 -> 32 -> 1, {n_params:,} parameters")
+print(f"  forward pass on a batch of 4: {tuple(net(torch.zeros(4, n_bands)).shape)}")
 '''),
         
         title="10 Bonus: Deep Learning with PyTorch",

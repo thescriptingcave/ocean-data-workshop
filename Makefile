@@ -11,8 +11,7 @@
 #   make check      the offline guarantee: everything with the network forbidden
 #   make fresh      clean clone test -- proves setup works from nothing
 #   make clean      remove generated notebooks and scratch files
-#   make clean-scratch  remove only cell-written scratch, keep the committed notebooks
-#   make bonus      optional extras (PyTorch, for notebook 10 only)
+#   make clean-scratch  remove only cell-written scratch, keep the notebooks
 #
 # Override the database port if you already run PostgreSQL locally:
 #   make setup PORT=5433
@@ -41,7 +40,7 @@ PORT_ARGS := $(if $(filter 5432,$(PORT)),,--port $(PORT))
 .DEFAULT_GOAL := all
 .PHONY: all setup lab lab-offline notebook notebooks test check check-notebooks check-independence \
         lint unit fresh clean clean-scratch clean-cache help deps kernel prefetch db db-ocean shell \
-        beginners ml bonus
+        beginners beginners-build ml
 
 ## all: set up, then open Jupyter Lab
 all: setup lab
@@ -64,10 +63,15 @@ kernel:
 
 ## lab: set up and open Jupyter Lab with Workshop as the default folder
 ##
+## Depends on `notebooks` and `beginners-build` because the .ipynb files are not
+## committed -- they are generated from workshop_notebooks.py and build_beginners.py, so
+## a fresh clone has none until something renders them. Without this, `make lab` on a
+## new machine opened an empty Workshop folder.
+##
 ## lab_root.py runs first because --notebook-dir sets the server root but does not
 ## beat JupyterLab's own restore of the last directory: one session inside workshop_3/
 ## and every later launch opened there instead, with the root setting ignored.
-lab: setup
+lab: setup notebooks beginners-build
 	@$(UVRUN) python scripts/lab_root.py
 	@$(UVRUN) jupyter lab --notebook-dir=Workshop
 
@@ -86,6 +90,14 @@ lab-offline: setup
 ## thing to give someone who has never fetched a URL.
 beginners:
 	@$(UV) run --with duckdb python scripts/build_beginners.py --execute
+
+## beginners-build: render Workshop Intro without running it
+##
+## What `make lab` calls, because the notebooks are generated and not committed, and
+## running them needs the network and a couple of minutes -- neither of which belongs in
+## the path to opening Jupyter.
+beginners-build:
+	@$(UV) run --with duckdb python scripts/build_beginners.py
 
 ## notebook: execute every notebook, saving output -- the supported way to run them
 notebook:
@@ -116,17 +128,6 @@ db:
 ## judgement rather than a pass/fail.
 ml:
 	@$(UVRUN) python scripts/ml_triviality.py
-
-## bonus: install the optional extras -- PyTorch, for notebook 10
-##
-## Separate from setup on purpose. torch is a ~200 MB download, and it is needed by
-## exactly one notebook, the last of twenty-six, which is labelled a bonus and whose
-## subject (classification, clustering) is already taught with scikit-learn in 02 and
-## 07. Nobody should wait through that download before starting the workshop, so it is
-## opt-in. Notebook 10 runs either way and says which it did.
-bonus:
-	@$(UV) sync --extra bonus
-	@echo "  PyTorch installed -- rerun notebook 10 to see it"
 
 ## db-ocean: also load the GLORYS ocean profile -- ~325 MB of transfer
 ##
@@ -188,11 +189,12 @@ fresh:
 
 ## clean: remove generated notebooks and scratch files
 ##
-## The notebooks are committed on purpose (build_notebooks.py:6), so this deletes
-## tracked files and `git checkout` is how you get them back without rebuilding.
-## 'make notebooks' re-renders workshop_2 and workshop_3; 'make beginners' re-renders
-## workshop_1. To throw away scratch only and keep the committed output, use
-## 'make clean-scratch'.
+## The notebooks are generated, not committed, so this deletes build products and
+## 'make notebooks' plus 'make beginners-build' put them back. Nothing here is tracked,
+## which is the point: an attendee can run, edit and delete a notebook freely and
+## `git status` stays clean.
+##
+## To throw away scratch only and keep the notebooks, use 'make clean-scratch'.
 clean:
 	@rm -f $(NB_GLOB)
 	@$(MAKE) --no-print-directory clean-scratch
@@ -212,8 +214,9 @@ clean-scratch:
 ## The cache is Workshop/.cache, which is what _fetch.py computes as
 ## Path(__file__).parent.parent / ".cache" from either workshop dir. This used to point
 ## at Workshop/workshop_2/.cache, a path that has not existed since the reorg, so it
-## silently did nothing and still printed success. The cache is tracked, so 'make
-## prefetch' (or git checkout) puts it back.
+## silently did nothing and still printed success. 'make setup' reinstalls it from the
+## committed archive.
+clean-cache:
 clean-cache:
 	@rm -rf Workshop/.cache
 	@echo "  cache cleared -- 'make prefetch' warms it again"

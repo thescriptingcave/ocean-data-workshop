@@ -27,6 +27,20 @@ __pycache__/
 # notebooks
 .ipynb_checkpoints/
 
+# The notebooks themselves. Generated from workshop_notebooks.py and
+# build_beginners.py, so tracking them tracked a build product of a source that is
+# already in the repo. Three costs, all paid by the people who use it most: running a
+# notebook modified a tracked file, so `git pull` then refused and asked for a stash;
+# a notebook saved from Lab drifted from its builder (ml_03_features advertised a
+# different kernelspec than the other 25); and 1.9 MB of output carried absolute temp
+# paths and kernel PIDs from the machine that happened to run it last.
+#
+# Nothing is lost -- 'make lab' builds them, 'make notebooks' re-renders workshop_2 and
+# workshop_3, 'make beginners-build' re-renders workshop_1, and CI executes them from
+# the builders on every run. An attendee can now run, edit and delete a notebook freely
+# and `git status` stays clean.
+Workshop/workshop_*/*.ipynb
+
 # The prefetched API responses, loose. Ignored, because they are not the artifact --
 # Workshop/workshop_2/cache-archive.tar.gz is, and it is committed (see below).
 # These 26 files were tracked by accident: the ignore rule read `notebooks/.cache/`,

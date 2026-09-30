@@ -3,12 +3,11 @@
 The notebooks are the deliverable, but writing them as raw ``.ipynb`` JSON is
 unreviewable and impossible to diff. So they are written here as a list of
 ``md(...)`` / ``code(...)`` calls and rendered to real notebooks by
-``scripts/build_notebooks.py``, which then executes them so the committed output is
+``scripts/build_notebooks.py``, which can also execute them so the output you read is
 real rather than illustrative.
 
-Why commit executed output at all: most attendees read these cold, days later, having
-not attended. A notebook with no output is a wall of unverified code. A notebook with
-output *and* assertions in it is a record of what actually happened.
+The ``.ipynb`` files are generated and not committed -- `make lab` renders them. See
+``build_notebooks.py`` for why, and `workshop_notebooks.py` for the content.
 
 Two conventions in every notebook, applied by ``code()`` rather than remembered:
 

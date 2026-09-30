@@ -221,7 +221,7 @@ table).
 
 ## Timing, measured
 
-Execution times, measured on this machine against the committed notebooks.
+Execution times, measured on this machine against a full build of the notebooks.
 **Nobody is waiting on compute** — 35 seconds for the whole workshop. The time is spent
 talking about traps.
 
@@ -267,7 +267,8 @@ been rehearsed end to end yet — treat it as untested.
 | `No module named 'ocean_data_workshop...'` | project not installed | `uv sync` |
 | Every call takes exactly the timeout | **IPv6 without an IPv6 route** | already handled by the helper; if you see it in your own code, force IPv4 — see Notebook 01 |
 | `Jupyter command 'jupyter-lab' not found` | `jupyterlab` not installed | `uv sync` — `workshop-setup` now checks for this |
-| Notebooks are unexecuted and you want the output | reading the `.ipynb` on disk | they are committed executed; run `uv run python scripts/build_notebooks.py --execute` |
+| Notebooks have no output and you want it | the `.ipynb` are generated, so they ship unexecuted | run `make notebook` (writes output into them) or just run the cells |
+| A notebook is missing after `git clean` | they are build products, not tracked | `make lab` builds them, or `make notebooks` |
 | A `login?next=...` page instead of the lab | Jupyter's token, in the terminal you launched from | paste the token from the original URL, or re-run the command |
 
 ### Getting the error messages you actually want

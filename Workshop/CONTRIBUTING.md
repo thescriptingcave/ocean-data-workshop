@@ -9,6 +9,11 @@ The notebooks are **generated from Python**, not written directly as `.ipynb` fi
 - Reliable rebuilding with `make` or `uv run python scripts/build_notebooks.py`
 - Consistent formatting across all notebooks
 
+The `.ipynb` files themselves are **not committed**. `scripts/workshop_notebooks.py` is
+the source; the notebooks are its build products, and `make lab` renders them. That means
+you can run, edit or delete a notebook locally and `git status` stays clean — only your
+changes to the Python sources show up in a diff, which is the point.
+
 ## How to Contribute
 
 1. **Create an issue** describing the bug or feature first

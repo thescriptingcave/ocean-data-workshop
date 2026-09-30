@@ -56,40 +56,67 @@ def test_helper_copies_are_identical(name: str, a: Path, b: Path) -> None:
     )
 
 
-def _notebooks() -> list[Path]:
-    out: list[Path] = []
-    for d in WORKSHOP_DIRS:
-        out.extend(sorted((ROOT / "Workshop" / d).glob("*.ipynb")))
+def _built_notebooks() -> list[tuple[str, dict]]:
+    """Render every notebook from its builder, in memory, without writing anything.
+
+    The notebooks are generated and not committed, so a test that read the .ipynb files
+    would pass on a developer machine and fail on a fresh clone -- exactly the failure
+    `make fresh` exists to catch. Rendering from the builders means the property under
+    test is checked wherever the tests happen to run.
+    """
+    import sys
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import build_notebooks
+    import workshop_notebooks as nbdefs
+
+    out: list[tuple[str, dict]] = []
+    for name in build_notebooks.NOTEBOOK_ORDER:
+        builder = getattr(nbdefs, f"nb_ml_{name.split('_')[1]}" if name.startswith("ml_") else f"nb_{name[:2]}")
+        if builder is None:
+            continue
+        nb = builder()
+        out.append((f"{name}.ipynb", json.loads(json.dumps(nb))))
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import build_beginners
+
+    for name in build_beginners.NOTEBOOKS:
+        builder = build_beginners.NOTEBOOKS[name]
+        out.append((f"{name}.ipynb", json.loads(json.dumps(builder()))))
+
     return out
 
 
-def test_every_workshop_has_notebooks() -> None:
-    """Guard the glob above: an empty list would make the tests below pass vacuously."""
-    nbs = _notebooks()
-    assert len(nbs) == 26, f"expected 26 committed notebooks, found {len(nbs)}"
-    for d in WORKSHOP_DIRS:
-        assert any(d in n.parts for n in nbs), f"no notebooks found in {d}"
+def test_every_builder_renders_a_notebook() -> None:
+    """Guard the collection above: an empty list would make the tests below vacuous."""
+    nbs = _built_notebooks()
+    assert len(nbs) == 26, f"expected 26 notebooks from the builders, rendered {len(nbs)}"
+    for name, nb in nbs:
+        assert name.endswith(".ipynb"), f"{name} is not a notebook filename"
+        assert nb.get("cells"), f"{name} rendered with no cells"
 
 
-@pytest.mark.parametrize("nb", _notebooks(), ids=lambda p: p.name)
-def test_notebook_kernelspec_is_the_builder_default(nb: Path) -> None:
-    """All notebooks advertise the same kernel.
+@pytest.mark.parametrize("name,nb", _built_notebooks(), ids=[n for n, _ in _built_notebooks()])
+def test_notebook_kernelspec_is_the_builder_default(name: str, nb: dict) -> None:
+    """Every notebook advertises the same kernel.
 
     Saving from Jupyter Lab rewrites `display_name` to the kernel the author was running,
     which is how ml_03_features.ipynb came to claim "Python 3 (ipykernel)" while the
     other 25 said "Python 3". Harmless to execution -- `name` is what Jupyter matches on
-    -- but it makes the picker inconsistent for a reader, and it means the committed file
-    no longer matches `nbbuild.py:68`.
+    -- but it makes the picker inconsistent for a reader.
+
+    Checked against freshly rendered notebooks, which is the point of not committing
+    them: a stale file on disk can no longer disagree with its builder.
     """
-    meta = json.loads(nb.read_text()).get("metadata", {})
+    meta = nb.get("metadata", {})
     ks = meta.get("kernelspec", {})
     assert ks.get("name") == EXPECTED_KERNEL_NAME, (
-        f"{nb.name} declares kernel {ks.get('name')!r}, expected {EXPECTED_KERNEL_NAME!r}"
+        f"{name} declares kernel {ks.get('name')!r}, expected {EXPECTED_KERNEL_NAME!r}"
     )
     assert ks.get("display_name") == EXPECTED_DISPLAY_NAME, (
-        f"{nb.name} declares display_name {ks.get('display_name')!r}, expected "
-        f"{EXPECTED_DISPLAY_NAME!r}. A Lab save rewrites this; re-render with "
-        f"'make notebooks' rather than committing the saved copy."
+        f"{name} declares display_name {ks.get('display_name')!r}, expected "
+        f"{EXPECTED_DISPLAY_NAME!r} (nbbuild.py)"
     )
 
 
