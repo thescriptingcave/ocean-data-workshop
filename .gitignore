@@ -26,17 +26,30 @@ __pycache__/
 
 # notebooks
 .ipynb_checkpoints/
-# prefetched API responses -- real data, but regenerable, and large
-notebooks/.cache/
-# scratch files the notebooks write into the working directory
-# notebooks/05 subsets GLORYS into notebooks/data/glorys -- downloaded data,
-# never source
-notebooks/data/
 
-# NOTE: notebooks/cache-archive.tar.gz is deliberately NOT ignored. It is
+# The prefetched API responses, loose. Ignored, because they are not the artifact --
+# Workshop/workshop_2/cache-archive.tar.gz is, and it is committed (see below).
+# These 26 files were tracked by accident: the ignore rule read `notebooks/.cache/`,
+# and when the reorg moved the tree to Workshop/ the rule stopped matching while the
+# files stayed tracked. The archive is a strict superset -- 33 entries against 26, and
+# it carries the Argo netCDF and SanctSound responses the tracked set was missing.
+# 'make prefetch' rebuilds this directory.
+Workshop/.cache/
+
+# NOTE: Workshop/workshop_2/cache-archive.tar.gz is deliberately NOT ignored. It is
 # committed, and it is what makes the workshop run with no network at all.
-notebooks/_*.nc
-notebooks/_traps.csv
+#
+# The scratch globs below are anchored per directory on purpose. An unanchored `_*.nc`
+# would also match _fetch.py and _sources.py, which are tracked source.
+#
+# _traps.csv was tracked too, for the same reason the loose cache was: written by a cell
+# (workshop_notebooks.py:2417, notebook 10) into a directory nobody had told git to
+# ignore. Running notebook 10 regenerates it.
+Workshop/workshop_1/_*.nc
+Workshop/workshop_2/_*.nc
+Workshop/workshop_3/_*.nc
+Workshop/workshop_*/_traps.csv
+notebooks/data/
 
 # macOS
 .DS_Store

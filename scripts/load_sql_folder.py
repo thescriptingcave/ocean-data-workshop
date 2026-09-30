@@ -22,7 +22,7 @@ import psycopg
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from ocean_data_workshop.dsn import dsn
+from ocean_data_workshop.dsn import dsn  # noqa: E402
 
 
 def load_sql_from_folder(folder: Path) -> int:
@@ -37,13 +37,13 @@ def load_sql_from_folder(folder: Path) -> int:
         print(f"No SQL files found in: {folder}")
         return 0
     
-    DSN = dsn()
+    dsn_str = dsn()
     total_lines = 0
     
     print(f"Loading SQL from: {folder}")
     print(f"Found {len(sql_files)} SQL file(s)")
     
-    with psycopg.connect(DSN, autocommit=True) as conn:
+    with psycopg.connect(dsn_str, autocommit=True) as conn:
         with conn.cursor() as cur:
             for sql_file in sql_files:
                 content = sql_file.read_text()
@@ -55,7 +55,7 @@ def load_sql_from_folder(folder: Path) -> int:
                     total_lines += lines
                 except Exception as e:
                     print(f"  ERROR executing {sql_file.name}:")
-                    print(f"    {type(e).__name__}: {str(e)}")
+                    print(f"    {type(e).__name__}: {e}")
                     return 1
     
     print(f"\nLoaded {total_lines} lines from {len(sql_files)} file(s)")

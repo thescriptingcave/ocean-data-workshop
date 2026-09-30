@@ -247,8 +247,16 @@ def register_jupyter() -> None:
     # test suite -- `build_notebooks.py` uses nbclient directly and never needed any
     # of it, so "10/10 execute clean" was true and still said nothing about whether
     # anyone could open the notebooks.
+    # No --user on purpose. Jupyter searches the *environment* data dir before the user
+    # one, so a `--user` spec is shadowed by the venv's own default `python3`
+    # ("Python 3 (ipykernel)") and the name below never appears in the Lab picker.
+    # --sys-prefix puts this spec in the venv, which is searched first, so it is the
+    # one actually used. It also matters that the argv is an absolute path: with the
+    # venv's stock spec the argv is a bare `python`, resolved from PATH by whatever
+    # starts the server. That is how this repo ended up with a kernel named
+    # "Python 3 (ocean-sim)" that launched a deleted venv from another project.
     r = run(
-        ["uv", "run", "python", "-m", "ipykernel", "install", "--user",
+        ["uv", "run", "python", "-m", "ipykernel", "install", "--sys-prefix",
          "--name", "python3", "--display-name", "Python 3 (ocean-sim)"],
         check=False, quiet=True, timeout=120,
     )

@@ -11,6 +11,7 @@
 #   make check      the offline guarantee: everything with the network forbidden
 #   make fresh      clean clone test -- proves setup works from nothing
 #   make clean      remove generated notebooks and scratch files
+#   make clean-scratch  remove only cell-written scratch, keep the committed notebooks
 #
 # Override the database port if you already run PostgreSQL locally:
 #   make setup PORT=5433
@@ -21,12 +22,24 @@ export OCEAN_DATA_WORKSHOP_PORT = $(PORT)
 UV        ?= uv
 UVRUN     ?= $(UV) run
 PY        := $(shell $(UV) run python -c "import sys; print(sys.executable)" 2>/dev/null)
-NB_DIR    := Workshop/workshop_2
+# Every directory a build script writes notebooks into. `make clean` has to span all
+# three: workshop_1 from build_beginners.py, workshop_2 and workshop_3 from
+# build_notebooks.py. Naming only workshop_2 left the ML notebooks uncleanable, which is
+# how a second full set of them survived a clean.
+#
+# Space-separated, and globbed per-directory with $(foreach) rather than by appending a
+# glob onto the list. `$(NB_DIRS)/*.ipynb` would expand to
+# `rm -f Workshop/workshop_1 Workshop/workshop_2 Workshop/workshop_3/*.ipynb`, where the
+# first two become bare arguments and rm fails with "is a directory". (Colon separators
+# do not help: they are only special in prerequisite lists, not in recipes.)
+NB_DIRS   := Workshop/workshop_1 Workshop/workshop_2 Workshop/workshop_3
+NB_GLOB   := $(foreach d,$(NB_DIRS),$(d)/*.ipynb)
+NB_SCRATCH := $(foreach d,$(NB_DIRS),$(d)/_*.nc $(d)/_traps.csv)
 PORT_ARGS := $(if $(filter 5432,$(PORT)),,--port $(PORT))
 
 .DEFAULT_GOAL := all
 .PHONY: all setup lab lab-offline notebook notebooks test check check-notebooks check-independence \
-        lint unit fresh clean clean-cache help deps kernel prefetch db db-ocean shell \
+        lint unit fresh clean clean-scratch clean-cache help deps kernel prefetch db db-ocean shell \
         beginners ml
 
 ## all: set up, then open Jupyter Lab
@@ -41,12 +54,20 @@ deps:
 	@$(UV) sync
 
 ## kernel: register the Jupyter kernel (setup does this too)
+##
+## No --user: Jupyter searches the environment data dir before the user one, so a
+## --user spec is shadowed by the venv's own python3 and never shows in the picker.
 kernel:
-	@$(UVRUN) python -m ipykernel install --user --name python3 \
+	@$(UVRUN) python -m ipykernel install --sys-prefix --name python3 \
 		--display-name "Python 3 (ocean-sim)"
 
 ## lab: set up and open Jupyter Lab with Workshop as the default folder
+##
+## lab_root.py runs first because --notebook-dir sets the server root but does not
+## beat JupyterLab's own restore of the last directory: one session inside workshop_3/
+## and every later launch opened there instead, with the root setting ignored.
 lab: setup
+	@$(UVRUN) python scripts/lab_root.py
 	@$(UVRUN) jupyter lab --notebook-dir=Workshop
 
 ## lab-offline: set up and open Jupyter Lab with Workshop as the default folder
@@ -54,6 +75,7 @@ lab: setup
 ## The network-is-bad case is also one command. Everything is served from the cache, and
 ## each request prints a warning saying so -- the numbers are real, just not new.
 lab-offline: setup
+	@$(UVRUN) python scripts/lab_root.py
 	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) jupyter lab --notebook-dir=Workshop
 
 ## beginners: rebuild and run Workshop Intro (5 notebooks, no database)
@@ -153,15 +175,36 @@ fresh:
 	@rm -rf .fresh-clone
 
 ## clean: remove generated notebooks and scratch files
+##
+## The notebooks are committed on purpose (build_notebooks.py:6), so this deletes
+## tracked files and `git checkout` is how you get them back without rebuilding.
+## 'make notebooks' re-renders workshop_2 and workshop_3; 'make beginners' re-renders
+## workshop_1. To throw away scratch only and keep the committed output, use
+## 'make clean-scratch'.
 clean:
-	@rm -f $(NB_DIR)/*.ipynb
-	@rm -f $(NB_DIR)/_*.nc $(NB_DIR)/_traps.csv
+	@rm -f $(NB_GLOB)
+	@$(MAKE) --no-print-directory clean-scratch
 	@echo "  removed the generated notebooks -- 'make notebooks' puts them back"
 
+## clean-scratch: remove cell-written scratch files, keeping the committed notebooks
+##
+## Deliberately not a `_*` glob: `_fetch.py` and `_sources.py` match it and are tracked
+## source, not scratch. Only the .nc a cell writes, and _traps.csv, are removed.
+## _traps.csv is itself tracked (written by 10_trap_table.ipynb), so this deletes a
+## committed file too; re-run that notebook or `git checkout` to get it back.
+clean-scratch:
+	@rm -f $(NB_SCRATCH)
+
 ## clean-cache: drop the prefetched responses, forcing a live fetch next time
+##
+## The cache is Workshop/.cache, which is what _fetch.py computes as
+## Path(__file__).parent.parent / ".cache" from either workshop dir. This used to point
+## at Workshop/workshop_2/.cache, a path that has not existed since the reorg, so it
+## silently did nothing and still printed success. The cache is tracked, so 'make
+## prefetch' (or git checkout) puts it back.
 clean-cache:
-	@rm -rf $(NB_DIR)/.cache
-	@echo "  cache cleared"
+	@rm -rf Workshop/.cache
+	@echo "  cache cleared -- 'make prefetch' warms it again"
 
 ## shell: a Python shell with everything already imported
 shell:

@@ -14,6 +14,7 @@ everything that is broken, not just the first thing.
 from __future__ import annotations
 
 import argparse
+import difflib
 import sys
 import time
 from pathlib import Path
@@ -22,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import workshop_notebooks as nbdefs  # noqa: E402
-from nbbuild import NOTEBOOKS, write  # noqa: E402
+from nbbuild import NOTEBOOKS  # noqa: E402
 
 # Name -> builder attribute in workshop_notebooks. Resolved lazily with getattr so a
 # notebook that has not been written yet does not stop the ones that have.
@@ -116,19 +117,52 @@ def execute(path: Path, timeout: int = 900) -> tuple[bool, str]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--execute", action="store_true", help="run them and save output")
-    ap.add_argument("--only", nargs="*", help="build just these notebook names")
+    ap.add_argument(
+        "--only",
+        nargs="*",
+        metavar="NAME",
+        help="build just these notebooks, by name exactly as they appear in NOTEBOOK_ORDER",
+    )
     args = ap.parse_args()
 
     wanted = args.only or NOTEBOOK_ORDER
+
+    # A notebook's output path is its name (see the `path =` line below), so an
+    # abbreviated --only like `ml_01` does not resolve to `ml_01_orientation.ipynb` --
+    # it renders a *second* notebook at a path nothing else knows about. That is how
+    # workshop_3 ended up with ten duplicate ml_NN.ipynb files: same builders, same
+    # content, a second untracked copy of every ML notebook. Refuse the misspelling
+    # rather than write the file.
+    #
+    # It also keeps the CI jobs honest: gates.yml names notebooks explicitly, so a
+    # rename there would otherwise build nothing and still exit 0.
+    unknown = [n for n in wanted if n not in NOTEBOOK_ORDER]
+    if unknown:
+        print("error: unknown notebook name(s):", ", ".join(unknown), file=sys.stderr)
+        for name in unknown:
+            # Prefix first: the failure mode is an abbreviation (`ml_01`), which
+            # difflib rates too low to offer even at its loosest cutoff.
+            close = [n for n in NOTEBOOK_ORDER if n.startswith(name)]
+            if not close:
+                close = difflib.get_close_matches(name, NOTEBOOK_ORDER, n=3, cutoff=0.6)
+            if close:
+                print(f"  did you mean: {' | '.join(close)}", file=sys.stderr)
+        print(
+            "  names are the full paths from NOTEBOOK_ORDER, e.g. `ml_01_orientation`\n"
+            "  run with no --only to see the full list",
+            file=sys.stderr,
+        )
+        return 2
+
     print("=" * 72)
     print(f"  {'building and ' if args.execute else ''}writing {len(wanted)} notebooks")
     print("=" * 72)
 
     built: list[Path] = []
     for name in wanted:
-        # Handle ML notebooks (ml_01 -> nb_ml_01)
+        # ML notebooks. The name is always the long form here, because --only is
+        # validated against NOTEBOOK_ORDER above: ml_01_orientation -> nb_ml_01.
         if name.startswith("ml_"):
-            # Extract the number: ml_01_orientation -> 01
             number = name.split("_")[1]  # "01"
             fn_name = f"nb_ml_{number}"
             # ML notebooks go to workshop_3
