@@ -45,16 +45,16 @@ kernel:
 	@$(UVRUN) python -m ipykernel install --user --name python3 \
 		--display-name "Python 3 (ocean-sim)"
 
-## lab: set up and open Jupyter Lab on the notebooks
+## lab: set up and open Jupyter Lab with Workshop as the default folder
 lab: setup
-	@$(UVRUN) jupyter lab --notebook-dir=Workshop $(NB_DIR)/
+	@$(UVRUN) jupyter lab --notebook-dir=Workshop
 
-## lab-offline: set up and open Jupyter Lab with the network forbidden
+## lab-offline: set up and open Jupyter Lab with Workshop as the default folder
 ##
 ## The network-is-bad case is also one command. Everything is served from the cache, and
 ## each request prints a warning saying so -- the numbers are real, just not new.
 lab-offline: setup
-	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) jupyter lab --notebook-dir=Workshop $(NB_DIR)/
+	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) jupyter lab --notebook-dir=Workshop
 
 ## beginners: rebuild and run Workshop Intro (5 notebooks, no database)
 ##
