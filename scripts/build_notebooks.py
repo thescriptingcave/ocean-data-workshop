@@ -131,14 +131,21 @@ def main() -> int:
             # Extract the number: ml_01_orientation -> 01
             number = name.split("_")[1]  # "01"
             fn_name = f"nb_ml_{number}"
+            # ML notebooks go to workshop_3
+            path = ROOT / "Workshop" / "workshop_3" / f"{name}.ipynb"
         else:
             fn_name = f"nb_{name[:2]}"
+            # Advanced notebooks go to workshop_2
+            path = ROOT / "Workshop" / "workshop_2" / f"{name}.ipynb"
         fn = getattr(nbdefs, fn_name, None)
         if fn is None:
             print(f"  SKIP {name:28} no builder yet")
             continue
         nb = fn()
-        path = write(nb, f"{name}.ipynb")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            import nbformat as nbf
+            nbf.write(nb, f)
         built.append(path)
         print(f"  wrote {path.name:34} {len(nb.cells):>3} cells")
 
