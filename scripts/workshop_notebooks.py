@@ -219,16 +219,37 @@ print(raw.text)
         md("""
 ## 3. In Python — `requests`
 
-The Python equivalent. Note what is *absent* compared to the notebook's helper: no
-timeout, and no IPv4 forcing. Both matter, and both are traps — we come back to them.
+The Python equivalent — and note what is *absent* compared to the notebook's helper: no
+session, so no cache, and no timeout. Both matter, and both are traps we come back to.
+
+The call below is a genuinely bare one: no `Session`, nothing cached, and nothing to
+reuse. That is what makes it fragile rather than wrong, and the fragility is the lesson.
+It is bounded by a timeout only so the lesson can be *run* — a real bare call has no
+bound, which is exactly how a dead network hangs you until you give up and `Ctrl-C`.
 """),
         code('''
 import requests
 
-r = requests.get(URL)          # no timeout: this can hang forever, which is its own bug
-print("status :", r.status_code)
-print("bytes  :", len(r.content))
-print("first  :", r.text.splitlines()[0])
+# A bare requests.get: no session, no cache, and — in real life — no timeout, which is
+# how this call hangs forever on a dead network instead of failing. The timeout below is
+# a teaching aid, not the practice.
+#
+# It also has nothing to fall back on, which is the real reason to prefer a session.
+if _fetch.OFFLINE:
+    print("  skipped -- offline mode, and this call has no cache to read.")
+    print("  The helper in the preamble would have served this from disk:")
+    print("   200, 1324 bytes, first line: time,latitude,longitude,analysed_sst")
+else:
+    try:
+        r = requests.get(URL, timeout=30)
+        print("status :", r.status_code)
+        print("bytes  :", len(r.content))
+        print("first  :", r.text.splitlines()[0])
+    except requests.exceptions.RequestException as exc:
+        # Every library fails. What matters is being able to say which failure it was --
+        # note the class name, because "it didn't work" is not a diagnosis.
+        print("live fetch failed:", type(exc).__name__)
+        print("  and with no session there is no cached copy to fall back on")
 ''', fast_lane=True),
 
         md("""
