@@ -16,6 +16,7 @@ classifiers = [
 dependencies = [
     "cmocean>=4.0.3",
     "copernicusmarine>=2.5.0",
+    "duckdb>=1.1.0",
     "gsw>=3.6.23",
     "h5netcdf>=1.8.1",
     "ipykernel>=7.3.0",
