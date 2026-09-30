@@ -31,6 +31,7 @@ from nbbuild import NOTEBOOKS, write  # noqa: E402
 # anything that assumes the reader has seen it; 00 is written last and listed first
 # only because it is what a person opens.
 NOTEBOOK_ORDER = [
+    # Data retrieval notebooks
     "00_orientation",
     "01_request_three_ways",
     "02_erddap_griddap",
@@ -42,6 +43,17 @@ NOTEBOOK_ORDER = [
     "08_gsw_domain_library",
     "09_capstone_join",
     "10_trap_table",
+    # ML notebooks
+    "ml_01_orientation",
+    "ml_02_classification",
+    "ml_03_features",
+    "ml_04_evaluation",
+    "ml_05_metrics",
+    "ml_06_wind",
+    "ml_07_clustering",
+    "ml_08_capstone",
+    "ml_09_traps",
+    "ml_10_pytorch",
 ]
 
 
@@ -114,7 +126,14 @@ def main() -> int:
 
     built: list[Path] = []
     for name in wanted:
-        fn = getattr(nbdefs, f"nb_{name[:2]}", None)
+        # Handle ML notebooks (ml_01 -> nb_ml_01)
+        if name.startswith("ml_"):
+            # Extract the number: ml_01_orientation -> 01
+            number = name.split("_")[1]  # "01"
+            fn_name = f"nb_ml_{number}"
+        else:
+            fn_name = f"nb_{name[:2]}"
+        fn = getattr(nbdefs, fn_name, None)
         if fn is None:
             print(f"  SKIP {name:28} no builder yet")
             continue

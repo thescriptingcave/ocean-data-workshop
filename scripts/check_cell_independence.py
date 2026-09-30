@@ -24,7 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-NOTEBOOKS = ROOT / "notebooks"
+NOTEBOOKS = ROOT / "Workshop" / "workshop_2"
 
 # The shared preamble is found by content, not position: it is the cell that does
 # `import _fetch` and creates the session. Notebooks put a different number of markdown

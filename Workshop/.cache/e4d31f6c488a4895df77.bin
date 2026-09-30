@@ -1,0 +1,45 @@
+{
+  "kind": "storage#objects",
+  "items": [
+    {
+      "kind": "storage#object",
+      "id": "noaa-passive-bioacoustic/sanctsound/products/sound_level_metrics/mb01/sanctsound_mb01_01_tol_1h/data/SanctSound_MB01_01_TOL_1h.csv/1670557108162569",
+      "selfLink": "https://www.googleapis.com/storage/v1/b/noaa-passive-bioacoustic/o/sanctsound%2Fproducts%2Fsound_level_metrics%2Fmb01%2Fsanctsound_mb01_01_tol_1h%2Fdata%2FSanctSound_MB01_01_TOL_1h.csv",
+      "mediaLink": "https://storage.googleapis.com/download/storage/v1/b/noaa-passive-bioacoustic/o/sanctsound%2Fproducts%2Fsound_level_metrics%2Fmb01%2Fsanctsound_mb01_01_tol_1h%2Fdata%2FSanctSound_MB01_01_TOL_1h.csv?generation=1670557108162569&alt=media",
+      "name": "sanctsound/products/sound_level_metrics/mb01/sanctsound_mb01_01_tol_1h/data/SanctSound_MB01_01_TOL_1h.csv",
+      "bucket": "noaa-passive-bioacoustic",
+      "generation": "1670557108162569",
+      "metageneration": "1",
+      "contentType": "text/csv",
+      "storageClass": "MULTI_REGIONAL",
+      "size": "1131060",
+      "md5Hash": "8HnkLom1exH9MninwyJ3sw==",
+      "crc32c": "h2aNDw==",
+      "etag": "CImgiZjO6/sCEAE=",
+      "timeCreated": "2022-12-09T03:38:28.264Z",
+      "updated": "2022-12-09T03:38:28.264Z",
+      "timeStorageClassUpdated": "2022-12-09T03:38:28.264Z",
+      "timeFinalized": "2022-12-09T03:38:28.264Z"
+    },
+    {
+      "kind": "storage#object",
+      "id": "noaa-passive-bioacoustic/sanctsound/products/sound_level_metrics/mb01/sanctsound_mb01_01_tol_1h/data/SanctSound_MB01_01_TOL_1h.nc/1670557108509708",
+      "selfLink": "https://www.googleapis.com/storage/v1/b/noaa-passive-bioacoustic/o/sanctsound%2Fproducts%2Fsound_level_metrics%2Fmb01%2Fsanctsound_mb01_01_tol_1h%2Fdata%2FSanctSound_MB01_01_TOL_1h.nc",
+      "mediaLink": "https://storage.googleapis.com/download/storage/v1/b/noaa-passive-bioacoustic/o/sanctsound%2Fproducts%2Fsound_level_metrics%2Fmb01%2Fsanctsound_mb01_01_tol_1h%2Fdata%2FSanctSound_MB01_01_TOL_1h.nc?generation=1670557108509708&alt=media",
+      "name": "sanctsound/products/sound_level_metrics/mb01/sanctsound_mb01_01_tol_1h/data/SanctSound_MB01_01_TOL_1h.nc",
+      "bucket": "noaa-passive-bioacoustic",
+      "generation": "1670557108509708",
+      "metageneration": "1",
+      "contentType": "application/x-netcdf",
+      "storageClass": "MULTI_REGIONAL",
+      "size": "991438",
+      "md5Hash": "86WzgpUqhIWKwK4mS9X/kw==",
+      "crc32c": "LmhOfg==",
+      "etag": "CIy4npjO6/sCEAE=",
+      "timeCreated": "2022-12-09T03:38:28.606Z",
+      "updated": "2022-12-09T03:38:28.606Z",
+      "timeStorageClassUpdated": "2022-12-09T03:38:28.606Z",
+      "timeFinalized": "2022-12-09T03:38:28.606Z"
+    }
+  ]
+}

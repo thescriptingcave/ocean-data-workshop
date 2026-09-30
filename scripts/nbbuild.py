@@ -24,7 +24,7 @@ from typing import Any
 
 import nbformat as nbf
 
-NOTEBOOKS = pathlib.Path(__file__).resolve().parent.parent / "notebooks"
+NOTEBOOKS = pathlib.Path(__file__).resolve().parent.parent / "Workshop" / "workshop_2"
 
 # The kernel name. "python3" resolves to whichever python the attendee's uv env
 # provides, which is what they want.

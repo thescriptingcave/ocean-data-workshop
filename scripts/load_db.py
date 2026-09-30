@@ -46,11 +46,11 @@ WINDOW_END = "2021-05-01"
 
 
 def apply_schema() -> None:
-    sql = (ROOT / "learning" / "schema.sql").read_text()
+    sql = (ROOT / "Workshop" / "sql_tutorials" / "schema.sql").read_text()
     with psycopg.connect(DSN, autocommit=True) as conn:
         with conn.cursor() as cur:
             cur.execute(sql)
-    print(f"  schema applied ({len(sql.splitlines())} lines from learning/schema.sql)")
+    print(f"  schema applied ({len(sql.splitlines())} lines from Workshop/sql_tutorials/schema.sql)")
 
 
 def load_sources() -> None:

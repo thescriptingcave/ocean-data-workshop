@@ -9,7 +9,7 @@ Design decisions that came out of feedback that the Advanced tier was too hard:
   * **Plain ``requests``.** No caching helper, no session wrapper. They learn the
     library they will use at work, not one that exists only in this repo.
   * **No Docker, no database, no ``make``, no ``.env``, no prefetch.** The whole
-    install is ``pip install -r beginners/requirements.txt``.
+    install is ``pip install -r Workshop/workshop_1/requirements.txt``.
   * **Three response shapes**, because those are what actually differ: delimited
     text, JSON, and compressed text. Same four techniques applied three times, so
     the second and third are recognisable.
@@ -24,7 +24,7 @@ Sources, all ocean, all anonymous, all verified while writing this:
   JSON ......... NOAA CO-OPS tides & currents  object wrapping a list, cryptic keys
   gzip ......... NDBC 46092                   compressed, fixed columns, sentinels
 
-``scripts/build_beginners.py --execute`` renders and runs them.
+``scripts/build_beginners.py --execute`` renders and runs Workshop Intro notebooks.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ from pathlib import Path
 import nbformat as nbf
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "beginners"
+OUT = ROOT / "Workshop" / "workshop_1"
 KERNEL = "python3"
 
 # ---------------------------------------------------------------- URLs, verbatim
@@ -73,7 +73,7 @@ def build(*cells, title: str):
     nb.metadata = {
         "kernelspec": {"display_name": "Python 3", "language": "python", "name": KERNEL},
         "language_info": {"name": "python"},
-        "beginners": {"title": title},
+        "workshop_1": {"title": title},
     }
     return nb
 

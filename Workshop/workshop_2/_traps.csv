@@ -1,0 +1,40 @@
+source,what_breaks,symptom,fix,verified
+04 access policy,403 and 404 both look like 'not allowed',"you go looking for an API key to fix a bucket name that does not exist; S3 answers NoSuchBucket (404) for a wrong name and AccessDenied (403) for a real one, and assert resp.ok collapses the difference","read the error body before authenticating: 404 needs a new name, 403 needs a key",live
+04 access policy,a public-looking bucket is not free to fetch,"landsat-pds reads as open, then answers 403 'Anonymous users cannot invoke requests against Requester Pays buckets. Please authenticate.' -- the owner pays egress, so the bytes are billable to whoever pulls them",requests pays nothing; Athena or Spectrum over an open bucket does,live
+04 access policy,free public data still refuses an anonymous request,POST to the public-data project returns 401 'Request is missing required authentication credential' before the query is even looked at,"a Google account and project; the sandbox needs no credit card, and the first 1 TiB of query processing per month is free",live
+01/02 ERDDAP,CSV has a names row AND a units row,first row of strings; off-by-one on every row after,"pd.read_csv(..., skiprows=[1])",live
+01 ERDDAP,"index expression is part of the parameter NAME, not its value",500 destinationVariableName=... wasn't found -- from either mistake,hand-build the query string; params= cannot express it,live
+01 ERDDAP,curl reads [ ] as a glob pattern,"exit code 3, URL malformat, and NO message under -s",curl -g / --globoff,live
+02 ERDDAP,.time=first / .lat=first are a no-op,byte-identical response; you get 520x the data you asked for,shrink the lat/lon box instead,live
+02 ERDDAP,constraint variables (&time=) rejected in griddap,400: '&' must be followed by a .griddap server variable,use the index form only,live
+02 ERDDAP,strides in the index [(0):(1):(29)] rejected,400: For variable=... axis#0=time Constraint=...,no strides exist; shrink the box,live
+02 ERDDAP,grid coordinates are float32,latitude.max() = 36.81999969 is 'outside' the box you asked for,"compare with a 1e-3 tolerance, never exactly",live
+02 ERDDAP,NaN fill is skipped by reductions; -999.0 fill is not,"mean silently wrong, no error","check the min, and mask explicitly",live
+02 ERDDAP,large CSV responses are paged,page 2 without page 1 returns empty with HTTP 200,request pages in order,documented
+01-08 any,AAAA records but no IPv6 route,requests ~100x slower than curl; every call takes exactly the timeout,force AF_INET (the workshop helper does this),live
+03 GCS,the data/ level is mandatory when FETCHING,404 with <Code>NoSuchKey</Code> -- reads as a permissions problem,include /data/ in the object key,live
+03 GCS,error bodies are XML even from the JSON API,"r.json() raises JSONDecodeError, hiding the real message",raise_for_status() then read r.text,live
+03 GCS,three capitalisations in one path,"directory all-lower, file title-case, trailing unit lower: TOL_1h not TOL_1H","copy a real listing, do not construct names by upper()",live
+03 GCS,aws s3 honours ~/.aws/config,commands silently redirected to a local MinIO on localhost:9000,"use the GCS JSON API -- no profile, no region, no credentials",live
+03 GCS,same recording at four resolutions,psd_1h is ~456 MB against tol_1h at ~0.7 MB,"list first, read the size, then download",live
+05 Argo,N_PARAM is in ds.sizes but unused by TEMP/PSAL/PRES,"ValueError on isel, or a silently wrong selection if you ignore it",check .shape before indexing,live
+05 Argo,"QC flags are bytes in _prof.nc, int8 in per-cycle files",(qc == 1) is silently all-False,"decode to int first; count the codes, do not use .all()",live
+05 Argo,"no index and no search API over 4,261 floats","/index/, /dac/index/, _prof_index.txt all 404","plan for screening, or use a source that has an index",live
+05 Argo,no small file holds a float's position,_meta.nc (35 KB) and _tech.nc (2.8 MB) both lack LATITUDE,position is in _prof.nc; screening costs 689 KB per candidate,live
+05 Argo,argopy is broken against erddapy 3.x,imports the removed _quote_string_constraints,fetch GDAC netCDF directly; do not downgrade xarray,live
+07 NDBC,"line 0 is names, line 1 is units, data starts at line 2","columns named #yr, mo, dy; KeyError much later","parse lines[0], slice from lines[2]",live
+07 NDBC,resolution is not uniform within a year file,"7,835 rows for 2019, not 8,760; file starts 5 January",resample explicitly; never assume hourly,live
+07 NDBC,"sentinels are per column, and 99 is a valid bearing",a blanket >= 99 filter deletes real easterly winds,"mask per column: 99 generally, 999 for WDIR/MWD",live
+07 NDBC,RangeIndex Series into DataFrame(index=DatetimeIndex),aligns on index; every column silently NaN,pass .to_numpy() so values are positional,live
+07 NDBC,"wind direction is FROM, and bearings wrap","mean(350, 10) = 180, the exact opposite of 0; 79.6 deg error over 2019","average the u/v vectors, then atan2",live
+08 gsw,"Conservative Temperature is degrees C, not Kelvin",returns nan with only a RuntimeWarning; propagates silently,"pass degC, or convert with gsw.CT_from_t",live
+08 gsw,SA is not SP,SA_from_SP needs pressure AND position; ~0.17 g/kg apart,"use gsw.SA_from_SP(sp, p, lon, lat)",live
+08 gsw,dc/dp is ~17 m/s per 1000 dbar,a per-dbar reading of a per-1000 quantity is 100x wrong,state the units of whatever you are comparing against,live
+06 Copernicus,describe with no filter returns a 170 MB catalogue,multi-minute hang on a 'describe' call,always pass --dataset-id and a filter,live
+06 Copernicus,the flag is --end-datetime,"not --stop-datetime, which is rejected",check --help; the CLI is not consistent across tools,live
+06 Copernicus,advertised variable count is reported as 0,a correct dataset that looks empty,do not trust the summary; request variables explicitly,live
+06 Copernicus,the human Product ID and the CLI dataset id differ,"'Dataset not found' for GLOBAL_MULTIYEAR_PHY_001_030, which is live",the CLI wants the CMEMS product code cmems_mod_glo_phy_my_0.083deg_P1D-m,live
+06 Copernicus,the error tells you to check the dataset id,"the id looks authoritative, so you start editing a correct one",diff the failing argv against a working one before theorising,live
+06 Copernicus,login env vars are COPERNICUSMARINE_SERVICE_USERNAME/PASSWORD,COPERNICUS_USERNAME / COPERNICUS_PASSWORD are silently ignored,read `copernicusmarine login --help` for the real names,live
+09 SQL,Postgres names every avg() result 'avg',three averages in one SELECT produce duplicate column names,alias every aggregate explicitly,live
+09 SQL,int(31.5) uses banker's rounding,"31.5 Hz becomes band_32hz, 62.5 would become band_62hz","state the rule, and test the boundary case",live

@@ -6,8 +6,8 @@ and learning/advanced/ directories in order.
 
 Usage:
     uv run python scripts/load_sql_folder.py
-    uv run python scripts/load_sql_folder.py --path learning/beginner
-    uv run python scripts/load_sql_folder.py --path learning/advanced
+    uv run python scripts/load_sql_folder.py --path Workshop/sql_tutorials/beginner
+    uv run python scripts/load_sql_folder.py --path Workshop/sql_tutorials/advanced
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ def main() -> int:
     parser.add_argument(
         "--path",
         type=str,
-        default=str(ROOT / "learning"),
+        default=str(ROOT / "Workshop" / "sql_tutorials"),
         help="Path to SQL folder (default: learning/ - loads all folders)",
     )
     parser.add_argument(
@@ -91,7 +91,7 @@ def main() -> int:
     args = parser.parse_args()
     
     if args.beginner:
-        return load_sql_from_folder(ROOT / "learning" / "beginner")
+        return load_sql_from_folder(ROOT / "Workshop" / "sql_tutorials" / "beginner")
     elif args.intermediate:
         return load_sql_from_folder(ROOT / "learning" / "intermediate")
     elif args.advanced:

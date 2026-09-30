@@ -12,21 +12,33 @@ to interpret them, not to predict them.
 
 | | if you have… | start |
 |---|---|---|
-| **Workshop Intro** | never fetched a URL | [`beginners/README.md`](beginners/README.md) — 5 notebooks, 40 min, 5 packages |
-| **Workshop Advanced** | used `requests` before | [`notebooks/README.md`](notebooks/README.md) — 11 notebooks, a database, ~39 catalogued traps |
+| **Workshop Intro** | never fetched a URL | [`Workshop/workshop_1/README.md`](Workshop/workshop_1/README.md) — 5 notebooks, 40 min, 5 packages |
+| **Workshop Advanced** | used `requests` before | [`Workshop/workshop_2/README.md`](Workshop/workshop_2/README.md) — 11 notebooks, a database, ~39 catalogued traps |
+| **SQL Tutorials** | learning SQL | [`Workshop/sql_tutorials/README.md`](Workshop/sql_tutorials/README.md) — beginner to advanced SQL |
+| **ML Workshop** | have ML experience | [`Workshop/workshop_3/README.md`](Workshop/workshop_3/README.md) — 10 ML notebooks |
+
+### Directory Structure
+
+```
+Workshop/
+├── workshop_1/        # Workshop Intro — beginners-friendly, no database
+├── workshop_2/        # Workshop Advanced — core data access patterns
+├── workshop_3/        # ML Workshop — classification, regression, clustering
+└── sql_tutorials/     # SQL learning material — beginner to advanced
+```
 
 The Intro is standalone: no database, no Docker, no `make`, no `.env`, no account, no
 API key. `pip install -r beginners/requirements.txt` and open Jupyter Lab.
 
 Also:
 
-**→ [`GETTING_STARTED.md`](GETTING_STARTED.md)** — from nothing to running, ~85 seconds
-**→ [`GLOSSARY.md`](GLOSSARY.md)** — every term used, defined
+**→ [`Workshop/docs/GETTING_STARTED.md`](Workshop/docs/GETTING_STARTED.md)** — from nothing to running, ~85 seconds
+**→ [`Workshop/docs/GLOSSARY.md`](Workshop/docs/GLOSSARY.md)** — every term used, defined
 
 **MIT licensed** for the code — see [`LICENSE`](LICENSE). The data it fetches is not
 covered; see the bottom of that file.
 
-If you are contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md) — the notebooks are
+If you are contributing: [`Workshop/CONTRIBUTING.md`](Workshop/CONTRIBUTING.md) — the notebooks are
 generated, do not edit the `.ipynb` files.
 
 ## Workshop Intro
@@ -106,78 +118,20 @@ high bands are the click band.
 live services**, the remaining one documented from the service's own behaviour, and not
 one of them documented anywhere.
 
-## The next workshop: ML on real labels
+## ML Workshop
 
-**Not built yet.** Before writing a lesson, the question worth answering is whether
-there is a real learning task here at all — and on this data there is a specific reason
-to doubt it.
+Machine learning on real oceanographic data. Teaches:
 
-NOAA's `ships` and `dolphin` labels are **algorithm output**: vessel events from LTSA
-analysis, dolphin detections from PamGuard. The hourly third-octave levels are *also*
-derived from LTSAs. So predicting a detection from a band level is close to predicting a
-quantity from itself. That is circular by construction, and the way to find out is not
-to argue about it but to measure it.
+- **Classification**: Dolphin detection from acoustic data
+- **Regression**: Wind prediction using time-series features
+- **Clustering**: Ocean regime identification with unsupervised learning
 
-`scripts/ml_triviality.py` does exactly that:
+Prerequisites: Basic ML knowledge (train/test split, features, targets).
 
 ```bash
-make ml
+uv run python scripts/build_notebooks.py            # render notebooks
+uv run python scripts/build_notebooks.py --execute  # run and save output
 ```
-
-The verdict is **a green light with a large asterisk**, and the asterisk is the
-interesting part. It is worth recording in full, because the reasoning generalises
-further than the conclusion does.
-
-- **`ships` is not a target at all.** 2,942 hours, 100% positive — it is an event list,
-  not a classification problem. A model on it would be measuring nothing.
-- **`dolphin` is a real task.** 8,387 hours, 22.6% positive, majority baseline 0.803.
-- **It is not the naive circularity.** A full model plateaus at 0.898, nowhere near the
-  1.0 that would mean the labels are recoverable from the same LTSA the bands came from.
-  The permutation control lands exactly on the majority rate, and the split is honestly
-  time-based, so nothing is leaking.
-
-Then three measurements that the first version of this spike did not make, and which
-change the conclusion:
-
-| | accuracy | f1 |
-|---|---|---|
-| always predict the majority | 0.803 | — |
-| **persistence: "was there one an hour ago?"** | **0.872** | 0.676 |
-| all 30 bands, no history | 0.898 | 0.700 |
-| lags + all 30 bands | 0.910 | 0.753 |
-| lags + bands **minus 20 kHz** | 0.876 | 0.647 |
-
-**Persistence alone scores 0.872 against the model's 0.898.** The label arrives in
-blocks — 86.5% hour-to-hour agreement, 565 positive runs, longest 21 hours — so most of
-the apparent skill is "it was there an hour ago", and a one-line rule gets most of the
-way there.
-
-And nearly all of what remains lives in **one band**. Shuffling only the 20 kHz column
-at test time takes the model from 0.898 to 0.548; removing it from the model entirely
-gives back almost nothing (+0.003 over lags alone).
-
-That band is the one that matters, because of where the data stops:
-
-```
-tol_1h    25 ..  20000 Hz     30 bands
-ol_1h   31.5 ..  16000 Hz     10 bands
-psd_1h    20 ..  24000 Hz  23,981 bins
-```
-
-The recorder samples at **96 kHz**, but no public product carries energy above ~24 kHz,
-and dolphin echolocation peaks far above that. So the single band the model relies on is
-the only band in the feature set that comes near the signal the label was derived from.
-
-**So: real, reproducible, and worth teaching — but a one-band task, whose one band is the
-one adjacent to the label's own provenance.** The features and the labels share a sensor
-and a processing chain. A model can work well and still be nearly uninformative about
-biology, because what it recovered was "was there a transient in this window", not "was
-there a dolphin". That is a real, subtle, and rarely-taught distinction, and it is a much
-better workshop than a clean detector would have been.
-
-Two more traps fall out of the same measurements: **a random split overstates accuracy**
-on a time series, and **train/test prevalence differ** (23.6% vs 19.7%) so an accuracy
-figure can fall while recall rises.
 
 ## Phase -1: data access audit
 
@@ -258,37 +212,50 @@ side.
 against a local service. Pass `--endpoint-url https://storage.googleapis.com`, or use the
 GCS JSON API, which needs no CLI at all.
 
-## Layout
+## Directory Structure
 
 ```
-beginners/       Workshop Intro — 5 notebooks, own requirements.txt
-  00_..ipynb     a URL is a thing you can fetch
-  01_..ipynb     comma-separated text
-  02_..ipynb     JSON
-  03_..ipynb     compressed text
-  04_..ipynb     you write them
-notebooks/       Workshop Advanced — 11 notebooks
-  _fetch.py      a real requests.Session, caching in send() only
-  _sources.py    one manifest of every URL, shared with the prefetch
-  cache-archive.tar.gz   the prefetched responses, so CI runs offline
-learning/        teaching material: schema.sql is the source of truth for the database
-scripts/         the builders, and the tooling around them
-  workshop_notebooks.py  all notebook content -- never edit a .ipynb
-  build_notebooks.py     render + execute, fail on error or a silent cell
-  build_beginners.py     the same for Workshop Intro, self-contained
-  load_db.py     apply the schema, load the data (--with-ocean for the slow part)
-  prefetch.py    warm the response cache
-  ml_triviality.py      the feasibility spike for the next workshop
-src/              ocean_data_workshop/ -- setup, credentials, DSN, HTTP helpers
-  workshop_setup.py     the 6-stage setup behind `make`
-probes/          Phase -1 access probes
-  _common.py     contract, cache, verdict format, IPv4-forcing HTTP session
-  probe_NN_*.py  one per dataset, exposing fetch(tiny=True)
-  run_all.py     runs everything, regenerates INVENTORY.md
-  VERDICTS.md    hand-written judgements — the real output
-  RESULTS.jsonl  append-only history, including fixed failures
-  LATEST.json    most recent result per probe
-tests/            unit tests, fast and offline
+Workshop/                    # All workshop materials organized by level
+├── workshop_1/             # Workshop Intro — 5 notebooks, own requirements.txt
+│   ├── 00_..ipynb          a URL is a thing you can fetch
+│   ├── 01_..ipynb          comma-separated text
+│   ├── 02_..ipynb          JSON
+│   ├── 03_..ipynb          compressed text
+│   └── 04_..ipynb          you write them
+├── workshop_2/             # Workshop Advanced — 11 notebooks
+│   ├── _fetch.py           a real requests.Session, caching in send() only
+│   ├── _sources.py         one manifest of every URL, shared with the prefetch
+│   ├── cache-archive.tar.gz the prefetched responses, so CI runs offline
+│   └── *.ipynb             the workshop notebooks
+└── workshop_3/             # ML Workshop — 10 ML notebooks
+    ├── ml_01_..ipynb       ML orientation, classification
+    ├── ml_02_..ipynb       Feature importance
+    ├── ml_03_..ipynb       Time-based evaluation
+    ├── ml_04_..ipynb       Beyond accuracy
+    ├── ml_05_..ipynb       Wind prediction
+    ├── ml_06_..ipynb       Clustering
+    ├── ml_07_..ipynb       Capstone
+    ├── ml_08_..ipynb       ML traps
+    └── ml_09_..ipynb       Deep learning
+
+scripts/                    the builders, and the tooling around them
+  workshop_notebooks.py     all notebook content -- never edit a .ipynb
+  build_notebooks.py        render + execute, fail on error or a silent cell
+  build_beginners.py        the same for Workshop Intro, self-contained
+  load_db.py                apply the schema, load the data (--with-ocean for the slow part)
+  prefetch.py               warm the response cache
+  ml_triviality.py          the feasibility spike for the ML workshop
+learning/                   SQL tutorials and database material
+src/                        ocean_data_workshop/ -- setup, credentials, DSN, HTTP helpers
+  workshop_setup.py         the 6-stage setup behind `make`
+probes/                     Phase -1 access probes
+  _common.py                contract, cache, verdict format, IPv4-forcing HTTP session
+  probe_NN_*.py             one per dataset, exposing fetch(tiny=True)
+  run_all.py                runs everything, regenerates INVENTORY.md
+  VERDICTS.md               hand-written judgements — the real output
+  RESULTS.jsonl             append-only history, including fixed failures
+  LATEST.json               most recent result per probe
+tests/                      unit tests, fast and offline
 ```
 
 Downloads cache to `~/.cache/ocean-sim-harness/` and are reused by later phases, so the

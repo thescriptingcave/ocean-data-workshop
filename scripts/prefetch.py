@@ -25,13 +25,13 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "notebooks"))
+sys.path.insert(0, str(ROOT / "Workshop" / "workshop_2"))
 sys.path.insert(0, str(ROOT / "src"))
 
 from _fetch import CACHE, describe, session  # noqa: E402
 from _sources import manifest  # noqa: E402
 
-ARCHIVE = ROOT / "notebooks" / "cache-archive.tar.gz"
+ARCHIVE = ROOT / "Workshop" / "workshop_2" / "cache-archive.tar.gz"
 
 
 def install_archive() -> bool:

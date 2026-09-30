@@ -22,7 +22,7 @@ export OCEAN_DATA_WORKSHOP_PORT = $(PORT)
 UV        ?= uv
 UVRUN     ?= $(UV) run
 PY        := $(shell $(UV) run python -c "import sys; print(sys.executable)" 2>/dev/null)
-NB_DIR    := notebooks
+NB_DIR    := Workshop/workshop_2
 PORT_ARGS := $(if $(filter 5432,$(PORT)),,--port $(PORT))
 
 .DEFAULT_GOAL := all

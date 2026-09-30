@@ -1,0 +1,7 @@
+{
+  "url": "https://storage.googleapis.com/storage/v1/b/noaa-passive-bioacoustic/o?prefix=sanctsound%2Fproducts%2Fsound_level_metrics%2Fmb01%2F&maxResults=200&delimiter=%2F",
+  "status": 200,
+  "content_type": "application/json; charset=UTF-8",
+  "encoding": "UTF-8",
+  "ts": 1790753860.704321
+}

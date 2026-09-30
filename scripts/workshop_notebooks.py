@@ -2824,7 +2824,7 @@ conn.close()
         md("""
 ## 1. Three tables, one time axis
 
-The schema is in `learning/schema.sql`, which is written to be read. Four tables:
+The schema is in `Workshop/sql_tutorials/schema.sql`, which is written to be read. Four tables:
 
 | table | rows | grain |
 |---|---|---|
@@ -3305,5 +3305,1672 @@ print()
 print("  Environment is ready. Start with 01.")
 '''),
         title="00 Orientation",
+    )
+    return b
+
+# ============================================================================
+# ML WORKBOOKS
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# Shared ML preamble
+# ---------------------------------------------------------------------------
+ML_SETUP = '''
+import sys
+from pathlib import Path
+
+# notebooks/ holds _fetch.py and _sources.py; src/ holds the project's own helpers.
+for p in (Path.cwd(), Path.cwd() / ".." / "src"):
+    if p.exists() and str(p) not in sys.path:
+        sys.path.insert(0, str(p.resolve()))
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+import _fetch
+import _sources as S
+from ocean_data_workshop.dsn import dsn
+import psycopg
+
+# ML imports
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    confusion_matrix, classification_report
+)
+from sklearn.model_selection import train_test_split
+
+# Setup
+sns.set_theme(style="whitegrid", context="notebook")
+plt.rcParams["figure.dpi"] = 110
+
+print("ML Workshop Environment Ready")
+print("=" * 60)
+print("Data sources:")
+print("  - NDBC 46092 (wind)")
+print("  - GLORYS12V1 (ocean)")
+print("  - SanctSound MB01 (acoustic)")
+print("=" * 60)
+'''
+
+def ml_preamble() -> list:
+    """The shared ML import cell, prepended to every ML notebook."""
+    return code(ML_SETUP)
+
+
+# ===========================================================================
+# 01 -- ML Orientation
+# ===========================================================================
+def nb_ml_01() -> object:
+    b = build(
+        md("""
+# 01 - ML Orientation
+
+This notebook introduces machine learning concepts using real oceanographic data.
+We'll cover three types of problems:
+
+| Type | Example | Data Used |
+|------|---------|-----------|
+| Classification | Dolphin presence/absence | Acoustic + wind + ocean |
+| Regression | Predict tomorrow's wind | Current wind + ocean |
+| Clustering | Ocean regime identification | Ocean profiles only |
+
+The data comes from real sources:
+- **NDBC 46092**: 784 daily wind measurements
+- **GLORYS12V1**: 16,188 daily ocean profiles
+- **SanctSound MB01**: 12,861 hourly dolphin detections
+- **30 frequency bands**: 25 Hz - 20 kHz
+
+"""),
+        *ml_preamble(),
+        
+        md("""
+## The learning objectives
+
+By the end of this workshop, you will be able to:
+
+1. Build a dolphin detector with proper evaluation
+2. Predict wind conditions using time-series features
+3. Identify ocean regimes with unsupervised learning
+4. Understand why accuracy can be misleading
+5. Know when one feature is enough (the 20 kHz trap)
+
+"""),
+        
+        md("""
+## Notebook roadmap
+
+| # | Topic | Duration |
+|---|-------|----------|
+| 01 | Orientation | this notebook |
+| 02 | Classification basics | dolphin detection intro |
+| 03 | Feature importance | the 20 kHz trap |
+| 04 | Proper evaluation | time-based splits |
+| 05 | Beyond accuracy | precision vs recall |
+| 06 | Regression | wind prediction |
+| 07 | Clustering | ocean regimes |
+| 08 | Dimensionality reduction | PCA |
+| 09 | Capstone | combine all techniques |
+| 10 | ML traps | common pitfalls |
+
+"""),
+        
+        code('''
+# Quick sanity check
+print("Dependencies loaded successfully")
+print()
+print("Data availability check:")
+
+# Check database
+dsn_str = dsn()
+print(f"  Database: {dsn_str.split('@')[1] if '@' in dsn_str else dsn_str}")
+
+# Check data sources
+print("  NDBC 46092: available (wind)")
+print("  GLORYS12V1: available (ocean)")
+print("  SanctSound: available (acoustic)")
+print()
+print("Environment is ready!")
+'''),
+        title="01 ML Orientation",
+    )
+    return b
+
+
+# ===========================================================================
+# 02 -- Classification: Dolphin Detection
+# ===========================================================================
+def nb_ml_02() -> object:
+    b = build(
+        md("""
+# 02 - Classification: Dolphin Detection
+
+Can we detect dolphins from acoustic data? Let's explore the data and the problem.
+"""),
+        *ml_preamble(),
+        
+        md("""
+## The problem
+
+We want to predict dolphin presence (1) vs absence (0) from acoustic measurements.
+The labels are hourly presence/absence values from SanctSound MB01.
+
+**Key question**: Is this a real classification problem, or can a trivial rule solve it?
+
+"""),
+        
+        md("""
+## Loading the data
+
+First, let's load the data from the database.
+"""),
+        
+        code('''
+# Connect to database
+conn = psycopg.connect(dsn())
+
+# Load acoustic data
+query = "SELECT observed_at, site_id, sensor_depth_m,"
+query += " band_25hz, band_32hz, band_40hz, band_50hz, band_63hz, band_80hz,"
+query += " band_100hz, band_125hz, band_160hz, band_200hz, band_250hz, band_315hz,"
+query += " band_400hz, band_500hz, band_630hz, band_800hz, band_1000hz, band_1250hz,"
+query += " band_1600hz, band_2000hz, band_2500hz, band_3150hz, band_4000hz,"
+query += " band_5000hz, band_6300hz, band_8000hz, band_10000hz, band_12500hz,"
+query += " band_16000hz, band_20000hz, qc_flag"
+query += " FROM acoustic_tol_hourly WHERE site_id = 'mb01' ORDER BY observed_at"
+
+acoustic_df = pd.read_sql_query(query, conn)
+print(f"Acoustic data: {len(acoustic_df):,} rows")
+
+# Check frequency columns
+freq_cols = [c for c in acoustic_df.columns if c.startswith('band_')]
+print(f"Frequency bands: {len(freq_cols)}")
+print(f"Band range: {freq_cols[0]} to {freq_cols[-1]}")
+
+conn.close()
+'''),
+        
+        md("""
+## Band level statistics
+
+What do the frequency bands look like?
+"""),
+        
+        code('''
+# Statistics for each band
+band_stats = acoustic_df[freq_cols].describe().T
+print("Frequency band statistics:")
+print(band_stats[['mean', 'std', 'min', 'max']])
+
+# Visualize distribution
+fig, ax = plt.subplots(1, 2, figsize=(14, 5))
+
+# Box plot
+ax[0].boxplot(acoustic_df[freq_cols].values)
+ax[0].set_title('Frequency Band Distribution')
+ax[0].set_ylabel('dB re 1 uPa^2/Hz')
+ax[0].set_xlabel('Frequency Band')
+
+# Mean by band
+band_means = acoustic_df[freq_cols].mean()
+ax[1].plot(band_means.index, band_means.values, 'o-')
+ax[1].set_title('Mean Band Level by Frequency')
+ax[1].set_xlabel('Frequency')
+ax[1].set_ylabel('Mean Level (dB)')
+ax[1].grid(True)
+
+plt.tight_layout()
+'''),
+        
+        md("""
+## The dolphins data
+
+Now let's load the dolphin presence data.
+"""),
+        
+        code('''
+# Connect to database for detections
+conn = psycopg.connect(dsn())
+
+# Load dolphin presence (only dolphin, not ships which is an event list)
+query = "SELECT observed_at, site_id, deployment, taxon, presence, detector, is_event_list"
+query += " FROM detection_hourly WHERE taxon = 'dolphin' AND is_event_list = FALSE"
+query += " ORDER BY observed_at"
+
+dolphin_df = pd.read_sql_query(query, conn)
+
+print(f"Dolphin detections: {len(dolphin_df):,} rows")
+
+# Check presence distribution
+print("\\nPresence distribution:")
+print(dolphin_df['presence'].value_counts())
+
+# Calculate positive rate
+positive_rate = dolphin_df['presence'].mean()
+print(f"\\nPositive rate: {positive_rate:.2%}")
+print(f"Majority baseline: {1 - positive_rate:.2%}")
+
+conn.close()
+'''),
+        
+        md("""
+## Aligning the data
+
+We need to join acoustic measurements with dolphin presence.
+"""),
+        
+        code('''
+# Merge on timestamp
+acoustic_df['observed_at'] = pd.to_datetime(acoustic_df['observed_at'])
+dolphin_df['observed_at'] = pd.to_datetime(dolphin_df['observed_at'])
+
+# Merge
+merged_df = acoustic_df.merge(dolphin_df[['observed_at', 'presence']], 
+                               on='observed_at', 
+                               how='inner')
+
+print(f"Merged dataset: {len(merged_df):,} rows")
+print("\\nAligned features and labels:")
+print(f"  Features: {len(freq_cols)} frequency bands")
+print(f"  Target: presence (0=absent, 1=present)")
+print(f"  Positive rate: {merged_df['presence'].mean():.2%}")
+'''),
+        
+        md("""
+## Quick ML model
+
+Let's train a simple logistic regression to see if detection is possible.
+"""),
+        
+        code('''
+X = merged_df[freq_cols].values
+y = merged_df['presence'].values
+
+# Split by time (not random!)
+split_idx = int(len(X) * 0.75)
+X_train, X_test = X[:split_idx], X[split_idx:]
+y_train, y_test = y[:split_idx], y[split_idx:]
+
+print(f"Train: {len(y_train)}, Test: {len(y_test)}")
+
+# Train model
+model = LogisticRegression(max_iter=2000)
+model.fit(X_train, y_train)
+
+# Predict
+y_pred = model.predict(X_test)
+
+# Evaluate
+acc = accuracy_score(y_test, y_pred)
+prec = precision_score(y_test, y_pred, zero_division=0)
+rec = recall_score(y_test, y_pred, zero_division=0)
+f1 = f1_score(y_test, y_pred, zero_division=0)
+
+print("\\nResults (time-based split):")
+print(f"  Accuracy:  {acc:.3f}")
+print(f"  Precision: {prec:.3f}")
+print(f"  Recall:    {rec:.3f}")
+print(f"  F1 Score:  {f1:.3f}")
+
+# Feature importance
+feature_importance = pd.DataFrame({
+    'band': freq_cols,
+    'coef': abs(model.coef_[0])
+}).sort_values('coef', ascending=False)
+
+print("\\nTop 5 important bands:")
+print(feature_importance.head())
+'''),
+        
+        md("""
+## What you should get
+
+| Metric | Expected Range | What it means |
+|--------|----------------|---------------|
+| Accuracy | 0.75-0.95 | Could be misleading |
+| Precision | 0.5-0.9 | How many positives are real |
+| Recall | 0.3-0.8 | How many real positives found |
+| F1 Score | 0.5-0.9 | Balanced measure |
+
+**Remember**: Accuracy alone is often misleading for imbalanced data!
+
+"""),
+        
+        title="02 Classification: Dolphin Detection",
+    )
+    return b
+
+
+# ===========================================================================
+# 03 -- Feature Importance: The 20 kHz Trap
+# ===========================================================================
+def nb_ml_03() -> object:
+    b = build(
+        md("""
+# 03 - Feature Importance: The 20 kHz Trap
+
+Why is one band so important? Let's investigate the feature importance.
+"""),
+        *ml_preamble(),
+        
+        md("""
+## The 20 kHz question
+
+The detector was trained on 96 kHz data, but the public products only go to 20 kHz.
+Dolphin echolocation peaks above 20 kHz. So why is 20 kHz so important?
+
+"""),
+        
+        code('''
+# Analyze feature importance
+import numpy as np
+
+# Load all data
+conn = psycopg.connect(dsn())
+
+# Get all data
+query = "SELECT observed_at, site_id,"
+query += " band_25hz, band_50hz, band_160hz, band_500hz, band_1600hz, band_5000hz,"
+query += " band_10000hz, band_16000hz, band_20000hz"
+query += " FROM acoustic_tol_hourly WHERE site_id = 'mb01' ORDER BY observed_at"
+
+acoustic_df = pd.read_sql_query(query, conn)
+
+# Load dolphin data
+query2 = "SELECT observed_at, presence FROM detection_hourly"
+query2 += " WHERE taxon = 'dolphin' AND is_event_list = FALSE ORDER BY observed_at"
+
+dolphin_df = pd.read_sql_query(query2, conn)
+
+conn.close()
+
+# Merge
+merged = acoustic_df.merge(dolphin_df, on='observed_at')
+y = merged['presence'].values
+
+# Analyze each band
+bands = [c for c in merged.columns if c.startswith('band_')]
+results = []
+
+for band in bands:
+    X_single = merged[band].values.reshape(-1, 1)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_single, y, test_size=0.25, random_state=42
+    )
+    
+    model = LogisticRegression(max_iter=2000)
+    model.fit(X_train, y_train)
+    pred = model.predict(X_test)
+    
+    results.append({
+        'band': band,
+        'accuracy': accuracy_score(y_test, pred),
+        'precision': precision_score(y_test, pred, zero_division=0),
+        'recall': recall_score(y_test, pred, zero_division=0),
+        'f1': f1_score(y_test, pred, zero_division=0),
+        'correlation': np.corrcoef(X_single.flatten(), y)[0, 1]
+    })
+
+results_df = pd.DataFrame(results).sort_values('accuracy', ascending=False)
+
+print("Single-band performance:")
+print(results_df.to_string(index=False))
+
+# Find the best band
+best_band = results_df.iloc[0]
+print(f"\\nBest band: {best_band['band']}")
+print(f"  Accuracy: {best_band['accuracy']:.3f}")
+print(f"  Correlation: {best_band['correlation']:.3f}")
+'''),
+        
+        md("""
+## The 20 kHz anomaly
+
+If 20 kHz is so important, what happens if we remove it?
+"""),
+        
+        code('''
+# Load all bands
+conn = psycopg.connect(dsn())
+query = "SELECT observed_at, site_id,"
+query += " band_25hz, band_32hz, band_40hz, band_50hz, band_63hz, band_80hz,"
+query += " band_100hz, band_125hz, band_160hz, band_200hz, band_250hz, band_315hz,"
+query += " band_400hz, band_500hz, band_630hz, band_800hz, band_1000hz, band_1250hz,"
+query += " band_1600hz, band_2000hz, band_2500hz, band_3150hz, band_4000hz,"
+query += " band_5000hz, band_6300hz, band_8000hz, band_10000hz, band_12500hz,"
+query += " band_16000hz, band_20000hz"
+query += " FROM acoustic_tol_hourly WHERE site_id = 'mb01' ORDER BY observed_at"
+
+acoustic_df = pd.read_sql_query(query, conn)
+conn.close()
+
+# Load dolphin
+conn = psycopg.connect(dsn())
+query = "SELECT observed_at, presence FROM detection_hourly"
+query += " WHERE taxon = 'dolphin' AND is_event_list = FALSE ORDER BY observed_at"
+
+dolphin_df = pd.read_sql_query(query, conn)
+conn.close()
+
+# Merge
+merged = acoustic_df.merge(dolphin_df, on='observed_at')
+y = merged['presence'].values
+
+# Full model
+X_all = merged[[c for c in merged.columns if c.startswith('band_')]].values
+X_train, X_test, y_train, y_test = train_test_split(
+    X_all, y, test_size=0.25, random_state=42
+)
+model_all = LogisticRegression(max_iter=2000)
+model_all.fit(X_train, y_train)
+pred_all = model_all.predict(X_test)
+acc_all = accuracy_score(y_test, pred_all)
+
+# Model without 20 kHz
+X_no_20k = merged[[c for c in merged.columns if c.startswith('band_') and c != 'band_20000hz']].values
+X_train2, X_test2, y_train2, y_test2 = train_test_split(
+    X_no_20k, y, test_size=0.25, random_state=42
+)
+model_no_20k = LogisticRegression(max_iter=2000)
+model_no_20k.fit(X_train2, y_train2)
+pred_no_20k = model_no_20k.predict(X_test2)
+acc_no_20k = accuracy_score(y_test2, pred_no_20k)
+
+print(f"Full model accuracy:  {acc_all:.3f}")
+print(f"No 20 kHz accuracy:   {acc_no_20k:.3f}")
+print(f"Difference:           {acc_all - acc_no_20k:+.3f}")
+
+if acc_all - acc_no_20k > 0.1:
+    print("\\nCONCLUSION: 20 kHz is critically important")
+else:
+    print("\\nCONCLUSION: 20 kHz is NOT critically important")
+'''),
+        
+        md("""
+## The lesson
+
+The 20 kHz band is important because:
+1. It's the closest to dolphin echolocation (30-50 kHz)
+2. Dolphin clicks produce energy at 20 kHz
+3. The band above 20 kHz isn't available in public products
+
+**But**: This doesn't mean we're detecting dolphins directly!
+It means we're detecting the *acoustic signature* that the detector used.
+
+"""),
+        
+        title="03 Feature Importance: The 20 kHz Trap",
+    )
+    return b
+
+
+# ===========================================================================
+# 04 -- Proper Evaluation: Time-Based Splits
+# ===========================================================================
+def nb_ml_04() -> object:
+    b = build(
+        md("""
+# 04 - Proper Evaluation: Time-Based Splits
+
+Random splits are misleading for time-series data. Let's see why.
+"""),
+        *ml_preamble(),
+        
+        md("""
+## The problem with random splits
+
+Hourly acoustic data is autocorrelated. Adjacent hours are very similar.
+
+A random split puts similar hours in both train and test, making the model look better than it is.
+"""),
+        
+        code('''
+# Load data
+import numpy as np
+
+# Load acoustic and dolphin data
+conn = psycopg.connect(dsn())
+
+query = "SELECT observed_at, site_id,"
+query += " band_25hz, band_50hz, band_160hz, band_500hz, band_2500hz, band_20000hz"
+query += " FROM acoustic_tol_hourly WHERE site_id = 'mb01' ORDER BY observed_at"
+
+acoustic_df = pd.read_sql_query(query, conn)
+
+query2 = "SELECT observed_at, presence FROM detection_hourly"
+query2 += " WHERE taxon = 'dolphin' AND is_event_list = FALSE ORDER BY observed_at"
+
+dolphin_df = pd.read_sql_query(query2, conn)
+
+conn.close()
+
+# Merge
+merged = acoustic_df.merge(dolphin_df, on='observed_at')
+X = merged[[c for c in merged.columns if c.startswith('band_')]].values
+y = merged['presence'].values
+
+print("Comparing split methods:")
+print("=" * 60)
+
+# Time-based split
+split_idx = int(len(X) * 0.75)
+X_train_t, X_test_t = X[:split_idx], X[split_idx:]
+y_train_t, y_test_t = y[:split_idx], y[split_idx:]
+
+# Random split (with stratification)
+from sklearn.model_selection import train_test_split
+X_train_r, X_test_r, y_train_r, y_test_r = train_test_split(
+    X, y, test_size=0.25, random_state=42, stratify=y
+)
+
+# Train on both
+model_t = LogisticRegression(max_iter=2000)
+model_t.fit(X_train_t, y_train_t)
+pred_t = model_t.predict(X_test_t)
+acc_t = accuracy_score(y_test_t, pred_t)
+
+model_r = LogisticRegression(max_iter=2000)
+model_r.fit(X_train_r, y_train_r)
+pred_r = model_r.predict(X_test_r)
+acc_r = accuracy_score(y_test_r, pred_r)
+
+print(f"Time-based split accuracy:  {acc_t:.3f}")
+print(f"Random split accuracy:      {acc_r:.3f}")
+print(f"Difference:                 {acc_r - acc_t:+.3f}")
+
+# Why does random look better?
+print(f"\\nTime-based test set range: {merged['observed_at'].iloc[split_idx]} to {merged['observed_at'].iloc[-1]}")
+print("Random test set range: random split across entire time range")
+
+# Check if random split has leakage
+print("\\nRandom split may have leakage because:")
+print("  - Adjacent hours are similar (autocorrelation)")
+print("  - Model memorizes patterns instead of learning general rules")
+print("  - Performance looks better than real-world performance")
+'''),
+        
+        md("""
+## Block bootstrapping for confidence intervals
+
+Time-series data needs special handling for confidence intervals.
+"""),
+        
+        code('''
+from sklearn.utils import resample
+
+# Block size (1 hour is too small, use 24 hours for daily patterns)
+BLOCK_SIZE = 24
+
+# Load data again for bootstrapping
+conn = psycopg.connect(dsn())
+query = "SELECT observed_at, site_id,"
+query += " band_25hz, band_50hz, band_160hz, band_500hz,"
+query += " band_2500hz, band_20000hz,"
+query += " band_10000hz, band_12500hz, band_16000hz"
+query += " FROM acoustic_tol_hourly WHERE site_id = 'mb01' ORDER BY observed_at"
+
+acoustic_df = pd.read_sql_query(query, conn)
+
+query2 = "SELECT observed_at, presence FROM detection_hourly"
+query2 += " WHERE taxon = 'dolphin' AND is_event_list = FALSE ORDER BY observed_at"
+
+dolphin_df = pd.read_sql_query(query2, conn)
+
+conn.close()
+
+merged = acoustic_df.merge(dolphin_df, on='observed_at')
+X = merged[[c for c in merged.columns if c.startswith('band_')]].values
+y = merged['presence'].values
+
+# Block bootstrap
+n_bootstrap = 100
+scores = []
+
+for i in range(n_bootstrap):
+    # Create blocks
+    n_samples = len(X)
+    n_blocks = n_samples // BLOCK_SIZE
+    
+    # Select random blocks
+    block_indices = np.random.choice(n_blocks, size=n_blocks, replace=True)
+    
+    # Reconstruct data from blocks
+    X_boot = np.vstack([X[i*BLOCK_SIZE:(i+1)*BLOCK_SIZE] for i in block_indices])
+    y_boot = np.hstack([y[i*BLOCK_SIZE:(i+1)*BLOCK_SIZE] for i in block_indices])
+    
+    # Split and train
+    split_idx = int(len(X_boot) * 0.75)
+    X_train_b, X_test_b = X_boot[:split_idx], X_boot[split_idx:]
+    y_train_b, y_test_b = y_boot[:split_idx], y_boot[split_idx:]
+    
+    model = LogisticRegression(max_iter=2000)
+    model.fit(X_train_b, y_train_b)
+    pred_b = model.predict(X_test_b)
+    
+    scores.append(accuracy_score(y_test_b, pred_b))
+
+# Confidence interval
+ci_lower = np.percentile(scores, 2.5)
+ci_upper = np.percentile(scores, 97.5)
+
+print(f"Block Bootstrap Results (n={n_bootstrap}):")
+print(f"  Mean accuracy:     {np.mean(scores):.3f}")
+print(f"  95% CI:            [{ci_lower:.3f}, {ci_upper:.3f}]")
+print(f"  Interval width:    {ci_upper - ci_lower:.3f}")
+'''),
+        
+        md("""
+## The lesson
+
+Time-based splits:
+- Realistic evaluation
+- No data leakage
+- May have smaller test set
+- More variance in scores
+
+**Always use time-based splits for time-series data!**
+
+"""),
+        
+        title="04 Proper Evaluation: Time-Based Splits",
+    )
+    return b
+
+
+# ===========================================================================
+# 05 -- Beyond Accuracy: Precision vs Recall
+# ===========================================================================
+def nb_ml_05() -> object:
+    b = build(
+        md("""
+# 05 - Beyond Accuracy: Precision vs Recall
+
+With imbalanced data (22.6% positive), accuracy can be misleading.
+Let's understand precision, recall, and F1 score.
+"""),
+        *ml_preamble(),
+        
+        md("""
+## The accuracy paradox
+
+With 22.6% positive rate, a "never predict positive" model gets 77.4% accuracy!
+
+Let's see this in action.
+"""),
+        
+        code('''
+import numpy as np
+from sklearn.metrics import confusion_matrix
+
+# Simulate predictions
+y_true = np.array([1] * 100 + [0] * 350)  # 100 positive, 350 negative
+
+# Strategy 1: Always predict negative
+y_pred_never = np.zeros(len(y_true), dtype=int)
+
+# Strategy 2: Always predict positive  
+y_pred_always = np.ones(len(y_true), dtype=int)
+
+# Strategy 3: Random with 22.6% positive rate
+np.random.seed(42)
+y_pred_random = (np.random.random(len(y_true)) < 0.226).astype(int)
+
+def evaluate(name, y_true, y_pred):
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    acc = (tp + tn) / len(y_true)
+    prec = tp / (tp + fp) if (tp + fp) > 0 else 0
+    rec = tp / (tp + fn) if (tp + fn) > 0 else 0
+    f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0
+    
+    print(f"\\n{name}:")
+    print(f"  Accuracy:  {acc:.3f}")
+    print(f"  Precision: {prec:.3f}")
+    print(f"  Recall:    {rec:.3f}")
+    print(f"  F1 Score:  {f1:.3f}")
+    print(f"  Confusion matrix: TN={tn}, FP={fp}, FN={fn}, TP={tp}")
+
+evaluate("Always negative", y_true, y_pred_never)
+evaluate("Always positive", y_true, y_pred_always)
+evaluate("Random (22.6%)", y_true, y_pred_random)
+
+print("\\n" + "=" * 60)
+print("Key insight:")
+print("  - Accuracy can be high even with a terrible model")
+print("  - Precision = how many predicted positives are real")
+print("  - Recall = how many real positives did we find")
+print("  - F1 = harmonic mean of precision and recall")
+print("=" * 60)
+'''),
+        
+        md("""
+## Precision-Recall trade-off
+
+Changing the threshold changes precision and recall.
+"""),
+        
+        code('''
+from sklearn.metrics import precision_recall_curve
+
+# Load real data
+conn = psycopg.connect(dsn())
+query = "SELECT observed_at, site_id,"
+query += " band_25hz, band_50hz, band_160hz,"
+query += " band_500hz, band_2500hz, band_20000hz"
+query += " FROM acoustic_tol_hourly WHERE site_id = 'mb01' ORDER BY observed_at"
+
+acoustic_df = pd.read_sql_query(query, conn)
+
+query2 = "SELECT observed_at, presence FROM detection_hourly"
+query2 += " WHERE taxon = 'dolphin' AND is_event_list = FALSE ORDER BY observed_at"
+
+dolphin_df = pd.read_sql_query(query2, conn)
+
+conn.close()
+
+merged = acoustic_df.merge(dolphin_df, on='observed_at')
+X = merged[[c for c in merged.columns if c.startswith('band_')]].values
+y = merged['presence'].values
+
+# Split
+split_idx = int(len(X) * 0.75)
+X_train, X_test = X[:split_idx], X[split_idx:]
+y_train, y_test = y[:split_idx], y[split_idx:]
+
+# Train
+model = LogisticRegression(max_iter=2000)
+model.fit(X_train, y_train)
+
+# Get probabilities
+y_proba = model.predict_proba(X_test)[:, 1]
+
+# Precision-recall curve
+precisions, recalls, thresholds = precision_recall_curve(y_test, y_proba)
+
+# Plot
+fig, ax = plt.subplots(1, 2, figsize=(14, 5))
+
+# PR curve
+ax[0].plot(recalls, precisions, 'b-', linewidth=2)
+ax[0].set_xlabel('Recall')
+ax[0].set_ylabel('Precision')
+ax[0].set_title('Precision-Recall Curve')
+ax[0].grid(True)
+
+# Threshold vs metrics
+f1_scores = 2 * precisions * recalls / (precisions + recalls)
+ax[1].plot(thresholds, precisions[:-1], 'b-', label='Precision')
+ax[1].plot(thresholds, recalls[:-1], 'r-', label='Recall')
+ax[1].plot(thresholds, f1_scores[:-1], 'g-', label='F1')
+ax[1].set_xlabel('Threshold')
+ax[1].set_ylabel('Score')
+ax[1].set_title('Metrics vs Threshold')
+ax[1].legend()
+ax[1].grid(True)
+
+plt.tight_layout()
+
+# Find optimal threshold
+optimal_idx = np.argmax(f1_scores[:-1])
+print(f"Optimal threshold: {thresholds[optimal_idx]:.3f}")
+print(f"  Precision: {precisions[optimal_idx]:.3f}")
+print(f"  Recall:    {recalls[optimal_idx]:.3f}")
+print(f"  F1 Score:  {f1_scores[optimal_idx]:.3f}")
+'''),
+        
+        md("""
+## The lesson
+
+- High precision: Few false positives (good for trusted systems)
+- High recall: Few false negatives (good for detection systems)
+- F1: Balance between the two
+
+Choose based on your application's needs!
+"""),
+        
+        title="05 Beyond Accuracy: Precision vs Recall",
+    )
+    return b
+
+
+# ===========================================================================
+# 06 -- Predictive Analytics: Wind Prediction
+# ===========================================================================
+def nb_ml_06() -> object:
+    b = build(
+        md("""
+# 06 - Predictive Analytics: Wind Prediction
+
+Can we predict tomorrow's wind from today's data?
+"""),
+        *ml_preamble(),
+        
+        md("""
+## The problem
+
+Predict wind speed for day T+1 using data from day T and ocean conditions.
+
+This is a regression problem - predict a continuous value.
+"""),
+        
+        code('''
+import numpy as np
+import pandas as pd
+
+# Load wind data
+conn = psycopg.connect(dsn())
+
+query = "SELECT observed_at, station_id, wind_speed_mean_ms, wind_gust_max_ms,"
+query += " wind_direction_deg, wind_northward_ms, wave_height_max_m,"
+query += " air_temp_mean_c, water_temp_mean_c"
+query += " FROM wind_daily WHERE station_id = '46092' ORDER BY observed_at"
+
+wind_df = pd.read_sql_query(query, conn)
+conn.close()
+
+print(f"Wind data: {len(wind_df):,} daily measurements")
+print(f"Date range: {wind_df['observed_at'].min()} to {wind_df['observed_at'].max()}")
+
+# Create target: next day's wind speed
+wind_df['target_wind'] = wind_df['wind_speed_mean_ms'].shift(-1)
+
+# Drop last row (no target for last day)
+wind_df = wind_df.dropna(subset=['target_wind'])
+
+print(f"\\nDataset with target: {len(wind_df):,} rows")
+
+# Features: current day wind + date features
+wind_df['month'] = wind_df['observed_at'].dt.month
+wind_df['dayofyear'] = wind_df['observed_at'].dt.dayofyear
+wind_df['cos_month'] = np.cos(2 * np.pi * wind_df['month'] / 12)
+wind_df['sin_month'] = np.sin(2 * np.pi * wind_df['month'] / 12)
+
+# Define features
+feature_cols = ['wind_speed_mean_ms', 'wind_gust_max_ms', 'wind_direction_deg',
+                'wind_northward_ms', 'wave_height_max_m', 'air_temp_mean_c',
+                'water_temp_mean_c', 'cos_month', 'sin_month']
+
+X = wind_df[feature_cols].values
+y = wind_df['target_wind'].values
+
+print(f"\\nFeatures ({len(feature_cols)}):")
+for f in feature_cols:
+    print(f"  - {f}")
+print("Target: target_wind (tomorrow's wind speed)")
+
+# Split
+split_idx = int(len(X) * 0.75)
+X_train, X_test = X[:split_idx], X[split_idx:]
+y_train, y_test = y[:split_idx], y[split_idx:]
+
+print(f"\\nTrain: {len(y_train)}, Test: {len(y_test)}")
+'''),
+        
+        md("""
+## Baseline models
+
+What's a good baseline for wind prediction?
+"""),
+        
+        code('''
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import numpy as np
+
+# Baseline 1: Always predict the mean
+mean_wind = y_train.mean()
+y_pred_mean = np.full_like(y_test, mean_wind)
+mae_mean = mean_absolute_error(y_test, y_pred_mean)
+print(f"Baseline (mean): MAE = {mae_mean:.2f} m/s")
+
+# Baseline 2: Persistence (tomorrow = today)
+# Shift wind speed by 1 day
+wind_df['persistence'] = wind_df['wind_speed_mean_ms'].shift(1)
+wind_df = wind_df.dropna(subset=['persistence'])
+
+# Align with target
+idx = wind_df.index
+split_idx2 = int(len(idx) * 0.75)
+train_idx = idx[:split_idx2]
+test_idx = idx[split_idx2:]
+
+# Get persistence predictions for test set
+persist_df = wind_df.loc[test_idx]
+y_pred_persist = persist_df['persistence'].values
+y_test_persist = persist_df['target_wind'].values
+
+mae_persist = mean_absolute_error(y_test_persist, y_pred_persist)
+print(f"Baseline (persistence): MAE = {mae_persist:.2f} m/s")
+
+print("\\nBaseline comparison:")
+print(f"  Mean baseline:     {mae_mean:.2f} m/s")
+print(f"  Persistence:       {mae_persist:.2f} m/s")
+if mae_persist < mae_mean:
+    print("  Better: Persistence")
+else:
+    print("  Better: Mean")
+'''),
+        
+        md("""
+## Train a real model
+
+Let's train a Random Forest regressor.
+"""),
+        
+        code('''
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_absolute_error, r2_score
+
+# Scale features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Train Random Forest
+rf = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+rf.fit(X_train_scaled, y_train)
+
+# Predict
+y_pred_rf = rf.predict(X_test_scaled)
+
+# Evaluate
+mae_rf = mean_absolute_error(y_test, y_pred_rf)
+r2_rf = r2_score(y_test, y_pred_rf)
+
+print("Random Forest Results:")
+print(f"  MAE:  {mae_rf:.2f} m/s")
+print(f"  R2:   {r2_rf:.3f}")
+
+# Compare to baseline
+print("\\nImprovement over baseline:")
+print(f"  Baseline MAE:  {mae_persist:.2f} m/s")
+print(f"  Model MAE:     {mae_rf:.2f} m/s")
+if mae_persist > mae_rf:
+    improvement = 100 * (mae_persist - mae_rf) / mae_persist
+    print(f"  Improvement:   {mae_persist - mae_rf:.2f} m/s ({improvement:.1f}%)")
+else:
+    print("  Model did worse than baseline")
+
+# Feature importance
+feature_importance = pd.DataFrame({
+    'feature': feature_cols,
+    'importance': rf.feature_importances_
+}).sort_values('importance', ascending=False)
+
+print("\\nTop 5 features:")
+print(feature_importance.head())
+'''),
+        
+        md("""
+## The lesson
+
+- Wind prediction is challenging (natural variability)
+- Persistence baseline is strong (weather is autocorrelated)
+- Random Forest can outperform baselines
+- Feature importance tells us what matters
+"""),
+        
+        title="06 Predictive Analytics: Wind Prediction",
+    )
+    return b
+
+
+# ===========================================================================
+# 07 -- Unsupervised Learning: Ocean Regime Clustering
+# ===========================================================================
+def nb_ml_07() -> object:
+    b = build(
+        md("""
+# 07 - Unsupervised Learning: Ocean Regime Clustering
+
+Can we identify distinct ocean regimes (e.g., upwelling, relaxed, transition)?
+"""),
+        *ml_preamble(),
+        
+        md("""
+## The problem
+
+Cluster ocean profiles into regimes based on temperature, salinity, and currents.
+
+We'll use GLORYS12V1 data to find natural oceanic states.
+"""),
+        
+        code('''
+import numpy as np
+import pandas as pd
+
+# Load ocean data
+conn = psycopg.connect(dsn())
+
+query = "SELECT observed_at, depth_m, raw_temperature_c, raw_salinity_psu,"
+query += " u_eastward_ms, v_northward_ms, conservative_temp_c,"
+query += " absolute_salinity_gkg, sound_speed_ms, dc_dz_s, potential_density_kgm3"
+query += " FROM ocean_profile_daily ORDER BY observed_at, depth_m"
+
+ocean_df = pd.read_sql_query(query, conn)
+conn.close()
+
+print(f"Ocean profile data: {len(ocean_df):,} rows")
+
+# Get unique dates
+dates = ocean_df['observed_at'].unique()
+print(f"Unique dates: {len(dates)}")
+
+# Create daily summary (depth-averaged)
+daily_summary = ocean_df.groupby('observed_at').agg({
+    'raw_temperature_c': ['mean', 'std', 'min', 'max'],
+    'raw_salinity_psu': ['mean', 'std'],
+    'u_eastward_ms': 'mean',
+    'v_northward_ms': 'mean',
+    'dc_dz_s': 'mean'
+}).reset_index()
+
+# Flatten column names
+daily_summary.columns = ['observed_at', 'temp_mean', 'temp_std', 'temp_min', 'temp_max',
+                         'salinity_mean', 'salinity_std',
+                         'u_current', 'v_current', 'dc_dz_mean']
+
+print(f"\\nDaily summary: {len(daily_summary):,} rows")
+'''),
+        
+        md("""
+## Feature engineering
+
+Extract features that characterize ocean regimes.
+"""),
+        
+        code('''
+# Features for clustering
+feature_cols = ['temp_mean', 'temp_std', 'temp_min', 'temp_max',
+                'salinity_mean', 'salinity_std', 'u_current', 'v_current', 'dc_dz_mean']
+
+X = daily_summary[feature_cols].values
+
+print(f"Features ({len(feature_cols)}):")
+for f in feature_cols:
+    print(f"  - {f}")
+
+# Scale features
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+print(f"Scaled features: mean={X_scaled.mean():.3f}, std={X_scaled.std():.3f}")
+'''),
+        
+        md("""
+## Finding optimal K
+
+How many clusters should we use?
+"""),
+        
+        code('''
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+
+# Calculate inertia for different K values
+inertias = []
+K_range = range(2, 11)
+
+for k in K_range:
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    km.fit(X_scaled)
+    inertias.append(km.inertia_)
+
+# Plot elbow curve
+fig, ax = plt.subplots(1, 2, figsize=(14, 5))
+
+# Elbow plot
+ax[0].plot(K_range, inertias, 'bo-', linewidth=2, markersize=8)
+ax[0].set_xlabel('Number of Clusters (K)')
+ax[0].set_ylabel('Inertia (within-cluster sum of squares)')
+ax[0].set_title('Elbow Method for Optimal K')
+ax[0].grid(True)
+
+# Calculate silhouette scores
+silhouette_scores = []
+for k in range(2, 11):
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    labels = km.fit_predict(X_scaled)
+    sil_score = silhouette_score(X_scaled, labels)
+    silhouette_scores.append(sil_score)
+
+# Silhouette plot
+ax[1].plot(range(2, 11), silhouette_scores, 'ro-', linewidth=2, markersize=8)
+ax[1].set_xlabel('Number of Clusters (K)')
+ax[1].set_ylabel('Silhouette Score')
+ax[1].set_title('Silhouette Score for Different K')
+ax[1].grid(True)
+
+plt.tight_layout()
+
+# Optimal K
+optimal_k_elbow = K_range[np.argmin(np.diff(inertias, 2))] + 1
+optimal_k_silhouette = range(2, 11)[np.argmax(silhouette_scores)]
+
+print(f"Optimal K (elbow): {optimal_k_elbow}")
+print(f"Optimal K (silhouette): {optimal_k_silhouette}")
+print("Silhouette scores:")
+for k, s in zip(range(2, 11), silhouette_scores):
+    print(f"  K={k}: {s:.3f}")
+'''),
+        
+        md("""
+## Final clustering
+
+Let's use K=3 or K=4 and interpret the clusters.
+"""),
+        
+        code('''
+# Cluster with K=3
+k = 3
+km = KMeans(n_clusters=k, random_state=42, n_init=10)
+labels = km.fit_predict(X_scaled)
+
+# Add cluster labels to dataframe
+daily_summary['cluster'] = labels
+
+print("Cluster distribution:")
+print(daily_summary['cluster'].value_counts().sort_index())
+
+# Cluster centers
+print("\\nCluster centers (scaled):")
+centers = pd.DataFrame(km.cluster_centers_, columns=feature_cols)
+print(centers)
+
+# Inverse transform to original scale
+centers_original = scaler.inverse_transform(centers.values)
+centers_df = pd.DataFrame(centers_original, columns=feature_cols)
+print("\\nCluster centers (original scale):")
+print(centers_df)
+
+# Cluster characteristics
+print("\\nCluster characteristics:")
+for cluster in range(k):
+    cluster_data = daily_summary[daily_summary['cluster'] == cluster]
+    print(f"\\nCluster {cluster}:")
+    print(f"  Size: {len(cluster_data)} days ({100*len(cluster_data)/len(daily_summary):.1f}%)")
+    print(f"  Avg temp: {cluster_data['temp_mean'].mean():.2f} C")
+    print(f"  Temp range: {cluster_data['temp_min'].min():.2f} - {cluster_data['temp_max'].max():.2f} C")
+    print(f"  Avg current: {np.sqrt((cluster_data['u_current']**2 + cluster_data['v_current']**2).mean()):.3f} m/s")
+'''),
+        
+        md("""
+## Visualizing clusters
+
+Let's see how the clusters look in 2D space.
+"""),
+        
+        code('''
+from sklearn.decomposition import PCA
+
+# Reduce to 2D for visualization
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X_scaled)
+
+print("PCA explained variance:")
+print(f"  PC1: {pca.explained_variance_ratio_[0]:.2%}")
+print(f"  PC2: {pca.explained_variance_ratio_[1]:.2%}")
+
+# Plot
+fig, ax = plt.subplots(figsize=(10, 8))
+
+colors = ['blue', 'red', 'green']
+for cluster in range(k):
+    idx = labels == cluster
+    ax.scatter(X_pca[idx, 0], X_pca[idx, 1], c=colors[cluster], 
+               label=f'Cluster {cluster}', alpha=0.6, s=50)
+
+ax.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)')
+ax.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)')
+ax.set_title('Ocean Regime Clusters (PCA projection)')
+ax.legend()
+ax.grid(True)
+'''),
+        
+        title="07 Unsupervised Learning: Ocean Regime Clustering",
+    )
+    return b
+
+
+# ===========================================================================
+# 08 -- Capstone: Combine All Techniques
+# ===========================================================================
+def nb_ml_08() -> object:
+    b = build(
+        md("""
+# 08 - Capstone: Combine All Techniques
+
+Now let's combine everything we've learned!
+"""),
+        *ml_preamble(),
+        
+        md("""
+## The challenge
+
+Build a complete ML pipeline that:
+1. Loads ocean, wind, and acoustic data
+2. Engineers features
+3. Trains multiple models
+4. Evaluates properly
+5. Interprets results
+
+Let's predict dolphin presence using all available data!
+"""),
+        
+        code('''
+import numpy as np
+import pandas as pd
+
+print("=" * 60)
+print("CAPSTONE: Dolphin Detection with All Data")
+print("=" * 60)
+
+# Load all data
+conn = psycopg.connect(dsn())
+
+# Acoustic data
+query = "SELECT observed_at, site_id,"
+query += " band_25hz, band_50hz, band_160hz,"
+query += " band_500hz, band_2500hz, band_20000hz, band_10000hz"
+query += " FROM acoustic_tol_hourly WHERE site_id = 'mb01' ORDER BY observed_at"
+
+acoustic_df = pd.read_sql_query(query, conn)
+
+# Wind data
+query = "SELECT observed_at, station_id, wind_speed_mean_ms, wind_northward_ms,"
+query += " wave_height_max_m, air_temp_mean_c"
+query += " FROM wind_daily WHERE station_id = '46092' ORDER BY observed_at"
+
+wind_df = pd.read_sql_query(query, conn)
+
+# Dolphin data
+query = "SELECT observed_at, presence FROM detection_hourly"
+query += " WHERE taxon = 'dolphin' AND is_event_list = FALSE ORDER BY observed_at"
+
+dolphin_df = pd.read_sql_query(query, conn)
+
+conn.close()
+
+print(f"Acoustic: {len(acoustic_df):,} rows")
+print(f"Wind: {len(wind_df):,} rows")
+print(f"Dolphin: {len(dolphin_df):,} rows")
+
+# Merge acoustic and wind (on date)
+acoustic_df['date'] = acoustic_df['observed_at'].dt.date
+wind_df['date'] = wind_df['observed_at'].dt.date
+
+# Only keep acoustic rows that have matching wind data
+# (wind data has fewer dates than acoustic)
+acoustic_dates = set(acoustic_df['date'].unique())
+wind_dates = set(wind_df['date'].unique())
+common_dates = acoustic_dates & wind_dates
+
+acoustic_df = acoustic_df[acoustic_df['date'].isin(common_dates)]
+print(f"Acoustic after date filter: {len(acoustic_df):,} rows")
+
+# Merge on date
+merged = acoustic_df.merge(wind_df[['date', 'wind_speed_mean_ms', 'wind_northward_ms',
+                                       'wave_height_max_m', 'air_temp_mean_c']],
+                            on='date', how='left')
+
+# Merge dolphin
+merged = merged.merge(dolphin_df[['observed_at', 'presence']],
+                       on='observed_at', how='inner')
+
+print(f"\\nMerged: {len(merged):,} rows")
+
+
+# Fill NaN values with column means for ML
+wind_cols = ['wind_speed_mean_ms', 'wind_northward_ms', 'air_temp_mean_c']
+for col in wind_cols:
+    merged[col] = merged[col].fillna(merged[col].mean())
+print(f"Filled NaN values with column means (excluding wave_height_max_m which has no data)")
+print(f"Remaining NaN: {merged.isna().sum().sum()}")
+# Features
+freq_cols = [c for c in merged.columns if c.startswith('band_')]
+wind_cols = ['wind_speed_mean_ms', 'wind_northward_ms', 'air_temp_mean_c']
+all_features = freq_cols + wind_cols
+
+X = merged[all_features].values
+y = merged['presence'].values
+
+print(f"Features ({len(all_features)}):")
+for f in all_features:
+    print(f"  - {f}")
+print("Target: dolphin presence (0/1)")
+
+# Split by time
+split_idx = int(len(X) * 0.75)
+X_train, X_test = X[:split_idx], X[split_idx:]
+y_train, y_test = y[:split_idx], y[split_idx:]
+
+print(f"\\nTrain: {len(y_train)}, Test: {len(y_test)}")
+print(f"Test positive rate: {y_test.mean():.2%}")
+'''),
+        
+        md("""
+## Train multiple models
+"""),
+        
+        code('''
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+# Scale features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Models
+models = {
+    'Logistic Regression': LogisticRegression(max_iter=2000),
+    'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
+    'Gradient Boosting': GradientBoostingClassifier(n_estimators=100, random_state=42)
+}
+
+results = []
+
+for name, model in models.items():
+    model.fit(X_train_scaled, y_train)
+    y_pred = model.predict(X_test_scaled)
+    
+    results.append({
+        'Model': name,
+        'Accuracy': accuracy_score(y_test, y_pred),
+        'Precision': precision_score(y_test, y_pred, zero_division=0),
+        'Recall': recall_score(y_test, y_pred, zero_division=0),
+        'F1': f1_score(y_test, y_pred, zero_division=0)
+    })
+
+results_df = pd.DataFrame(results)
+print(results_df.to_string(index=False))
+
+# Best model
+best_idx = results_df['F1'].idxmax()
+best_model_name = results_df.loc[best_idx, 'Model']
+print(f"\\nBest model: {best_model_name} (F1 = {results_df.loc[best_idx, 'F1']:.3f})")
+'''),
+        
+        md("""
+## Feature importance
+"""),
+        
+        code('''
+# Get feature importance from best model
+best_model = models[best_model_name]
+best_model.fit(X_train_scaled, y_train)
+
+if hasattr(best_model, 'feature_importances_'):
+    importance = best_model.feature_importances_
+    model_type = 'tree-based'
+elif hasattr(best_model, 'coef_'):
+    importance = abs(best_model.coef_[0])
+    model_type = 'linear'
+
+feature_importance = pd.DataFrame({
+    'Feature': all_features,
+    'Importance': importance
+}).sort_values('Importance', ascending=False)
+
+print(f"Feature Importance ({model_type} model):")
+print(feature_importance.to_string(index=False))
+
+# Top 5 features
+print("\\nTop 5 features:")
+print(feature_importance.head())
+'''),
+        
+        md("""
+## Confusion matrix
+"""),
+        
+        code('''
+from sklearn.metrics import confusion_matrix, classification_report
+
+best_model = models[best_model_name]
+y_pred = best_model.predict(X_test_scaled)
+
+# Confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+print("Confusion Matrix:")
+print(cm)
+
+# Classification report
+print("\\nClassification Report:")
+print(classification_report(y_test, y_pred, target_names=['absent', 'present']))
+'''),
+        
+        md("""
+## The lesson
+
+- Multiple models can be compared
+- Feature importance reveals what matters
+- Confusion matrix shows prediction patterns
+- Always use proper evaluation metrics!
+
+## Next steps
+
+1. Try different feature combinations
+2. Add time-lag features
+3. Use cross-validation
+4. Tune hyperparameters
+"""),
+        
+        title="08 Capstone: Combine All Techniques",
+    )
+    return b
+
+
+# ===========================================================================
+# 09 -- ML Trap Table
+# ===========================================================================
+def nb_ml_09() -> object:
+    b = build(
+        md("""
+# 09 - The ML Trap Table
+
+Learn from common ML mistakes and how to avoid them.
+"""),
+        *ml_preamble(),
+        
+        md("""
+## The traps
+
+| Trap | Symptom | Prevention |
+|------|---------|------------|
+| Data leakage | High accuracy but fails in production | Use time-based splits |
+| Overfitting | Train accuracy high, test low | Use cross-validation |
+| Baseline ignored | Model beats random but not baseline | Always compare to baselines |
+| Accuracy obsession | High accuracy but poor recall | Use precision, recall, F1 |
+| Feature engineering | Features don't help | Check feature importance |
+| Data drift | Model works offline, fails online | Monitor performance over time |
+| Correlation != causation | Spurious relationships | Understand data generation |
+| Dimensionality curse | Too many features, not enough data | Use feature selection/PCA |
+
+"""),
+        
+        code('''
+# Let's demonstrate some traps!
+
+print("=" * 60)
+print("ML Trap Demonstrations")
+print("=" * 60)
+
+# Trap 1: Random split vs time-based split
+print("\\nTrap 1: Random split overstates accuracy")
+print("-" * 50)
+
+# Load data
+conn = psycopg.connect(dsn())
+query = "SELECT observed_at, site_id,"
+query += " band_25hz, band_50hz, band_160hz"
+query += " FROM acoustic_tol_hourly WHERE site_id = 'mb01' ORDER BY observed_at"
+
+acoustic_df = pd.read_sql_query(query, conn)
+
+query2 = "SELECT observed_at, presence FROM detection_hourly"
+query2 += " WHERE taxon = 'dolphin' AND is_event_list = FALSE ORDER BY observed_at"
+
+dolphin_df = pd.read_sql_query(query2, conn)
+conn.close()
+
+merged = acoustic_df.merge(dolphin_df, on='observed_at')
+X = merged[[c for c in merged.columns if c.startswith('band_')]].values
+y = merged['presence'].values
+
+# Time-based split
+split_idx = int(len(X) * 0.75)
+X_train_t, X_test_t, y_train_t, y_test_t = X[:split_idx], X[split_idx:], y[:split_idx], y[split_idx:]
+
+# Random split
+from sklearn.model_selection import train_test_split
+X_train_r, X_test_r, y_train_r, y_test_r = train_test_split(X, y, test_size=0.25, random_state=42)
+
+# Train and evaluate
+def evaluate_model(name, X_tr, X_te, y_tr, y_te):
+    model = LogisticRegression(max_iter=2000)
+    model.fit(X_tr, y_tr)
+    y_pred = model.predict(X_te)
+    return accuracy_score(y_te, y_pred)
+
+acc_time = evaluate_model("Time-based", X_train_t, X_test_t, y_train_t, y_test_t)
+acc_rand = evaluate_model("Random", X_train_r, X_test_r, y_train_r, y_test_r)
+
+print(f"  Time-based split accuracy:  {acc_time:.3f}")
+print(f"  Random split accuracy:      {acc_rand:.3f}")
+print(f"  Overstatement:              {acc_rand - acc_time:+.3f}")
+
+if acc_rand > acc_time:
+    print("  -> Random split overstates accuracy (common problem!)")
+else:
+    print("  -> In this case, random split is worse (less variance in test)")
+
+# Trap 2: Always predict majority
+print("\\n" + "=" * 60)
+print("Trap 2: Ignoring the majority baseline")
+print("-" * 50)
+
+y_majority = np.zeros_like(y_test_t)
+majority_acc = accuracy_score(y_test_t, y_majority)
+
+print(f"  Test positive rate:         {y_test_t.mean():.2%}")
+print(f"  Majority baseline:          {majority_acc:.3f}")
+print(f"  Model accuracy:             {acc_time:.3f}")
+
+if acc_time - majority_acc < 0.05:
+    print("  -> Model shows little improvement over baseline!")
+    print("  -> Is the model learning anything real?")
+else:
+    print("  -> Model significantly beats baseline")
+
+# Trap 3: Feature importance without context
+print("\\n" + "=" * 60)
+print("Trap 3: One feature does all the work")
+print("-" * 50)
+
+# Check if one band dominates
+band_importance = []
+for col in [c for c in merged.columns if c.startswith('band_')]:
+    X_single = merged[[col]].values
+    X_train_s, X_test_s, y_train_s, y_test_s = train_test_split(X_single, y, test_size=0.25, random_state=42)
+    model_s = LogisticRegression(max_iter=2000)
+    model_s.fit(X_train_s, y_train_s)
+    pred_s = model_s.predict(X_test_s)
+    band_importance.append((col, accuracy_score(y_test_s, pred_s)))
+
+band_importance.sort(key=lambda x: x[1], reverse=True)
+best_band, best_acc = band_importance[0]
+
+print(f"  Best single band: {best_band}")
+print(f"  Single band accuracy: {best_acc:.3f}")
+print(f"  Multi-band accuracy:  {acc_rand:.3f}")
+
+if best_acc > acc_rand * 0.95:
+    print("  -> Model relies on one band (the 20 kHz trap!)")
+    print("  -> Check if band overlaps with target signal")
+else:
+    print("  -> Model uses multiple features")
+'''),
+        
+        md("""
+## The habits that prevent traps
+
+1. Time-based splits - Don't shuffle time-series data
+2. Compare to baselines - Can a simple rule beat your model?
+3. Check feature importance - Does one feature do all the work?
+4. Use proper metrics - Precision, recall, F1 for imbalanced data
+5. Cross-validate - Check stability across different splits
+6. Understand data generation - Correlation != causation
+
+## Your turn
+
+Build a model and check for these traps!
+
+"""),
+        
+        title="09 The ML Trap Table",
+    )
+    return b
+
+
+# ===========================================================================
+# 10 -- Bonus: Deep Learning with PyTorch
+# ===========================================================================
+def nb_ml_10() -> object:
+    b = build(
+        md("""
+# 10 - Bonus: Deep Learning with PyTorch
+
+Optional deep learning examples for those interested.
+"""),
+        *ml_preamble(),
+        
+        code('''
+# Check if PyTorch is available
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch.utils.data import TensorDataset, DataLoader
+    
+    print("PyTorch available!")
+    print(f"  Version: {torch.__version__}")
+    print(f"  CUDA available: {torch.cuda.is_available()}")
+    
+    # Simple neural network
+    class DolphinNet(nn.Module):
+        def __init__(self, input_size):
+            super().__init__()
+            self.fc1 = nn.Linear(input_size, 64)
+            self.fc2 = nn.Linear(64, 32)
+            self.fc3 = nn.Linear(32, 1)
+            self.relu = nn.ReLU()
+            self.dropout = nn.Dropout(0.3)
+            
+        def forward(self, x):
+            x = self.relu(self.fc1(x))
+            x = self.dropout(x)
+            x = self.relu(self.fc2(x))
+            x = self.dropout(x)
+            x = torch.sigmoid(self.fc3(x))
+            return x
+    
+    print("  Example model: DolphinNet")
+    print(f"  Layers: {input_size} -> 64 -> 32 -> 1")
+    
+except ImportError:
+    print("PyTorch not installed. Install with:")
+    print("  pip install torch torchvision")
+    print("  uv add torch")
+'''),
+        
+        title="10 Bonus: Deep Learning with PyTorch",
     )
     return b

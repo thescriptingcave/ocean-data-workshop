@@ -1,0 +1,7 @@
+{
+  "url": "https://coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.csv?analysed_sst%5B(2019-09-01T00:00:00Z):(2019-09-30T00:00:00Z)%5D%5B(36.6):(36.82)%5D%5B(-122.2):(-121.98)%5D",
+  "status": 200,
+  "content_type": "text/csv;charset=ISO-8859-1",
+  "encoding": "ISO-8859-1",
+  "ts": 1790753858.7750201
+}
