@@ -43,7 +43,7 @@ make notebook    # run all notebooks, saving output
 **→ [`Workshop/docs/GLOSSARY.md`](Workshop/docs/GLOSSARY.md)** — every term used, defined
 
 **MIT licensed** for the code — see [`LICENSE`](LICENSE). The data it fetches is not
-covered; see the bottom of that file.
+covered; see the bottom of that file. Release notes: [`CHANGELOG.md`](CHANGELOG.md).
 
 If you are contributing: [`Workshop/CONTRIBUTING.md`](Workshop/CONTRIBUTING.md) — the notebooks are
 generated, do not edit the `.ipynb` files.

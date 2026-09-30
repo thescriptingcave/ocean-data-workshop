@@ -1,6 +1,6 @@
 [project]
 name = "ocean-data-workshop"
-version = "0.1.0"
+version = "1.0.0"
 description = "A hands-on workshop on retrieving real ocean data from public APIs, and on the traps in doing so."
 readme = "README.md"
 license = "MIT"
