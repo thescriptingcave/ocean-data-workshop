@@ -312,8 +312,9 @@ def main() -> int:
 
     print("\n" + "=" * 72)
     ok(f"setup complete in {time.time() - t0:.0f} s")
-    print("\n  Next:  uv run jupyter lab notebooks/")
-    print("\n  Offline, if the network is bad:  OCEAN_DATA_WORKSHOP_OFFLINE=1 uv run jupyter lab notebooks/")
+    print("\n  Next:  uv run jupyter lab --notebook-dir=Workshop Workshop/workshop_2/")
+    print("\n  Offline, if the network is bad:")
+    print("    OCEAN_DATA_WORKSHOP_OFFLINE=1 uv run jupyter lab --notebook-dir=Workshop Workshop/workshop_2/")
     print()
     return 0
 

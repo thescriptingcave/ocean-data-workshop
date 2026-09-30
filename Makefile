@@ -47,14 +47,14 @@ kernel:
 
 ## lab: set up and open Jupyter Lab on the notebooks
 lab: setup
-	@$(UVRUN) jupyter lab $(NB_DIR)/
+	@$(UVRUN) jupyter lab --notebook-dir=Workshop $(NB_DIR)/
 
 ## lab-offline: set up and open Jupyter Lab with the network forbidden
 ##
 ## The network-is-bad case is also one command. Everything is served from the cache, and
 ## each request prints a warning saying so -- the numbers are real, just not new.
 lab-offline: setup
-	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) jupyter lab $(NB_DIR)/
+	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) jupyter lab --notebook-dir=Workshop $(NB_DIR)/
 
 ## beginners: rebuild and run Workshop Intro (5 notebooks, no database)
 ##
