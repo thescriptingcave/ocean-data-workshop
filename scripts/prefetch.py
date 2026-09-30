@@ -45,6 +45,15 @@ def install_archive() -> bool:
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(ARCHIVE, "r:gz") as tf:
         tf.extractall(CACHE.parent, filter="data")
+
+    # macOS writes an AppleDouble `._<name>` sidecar next to anything carrying extended
+    # attributes, and the archive was built on a Mac, so unpacking drops a `._.cache`
+    # into Workshop/. That leaves a fresh clone dirty -- `git status` shows one stray
+    # file, and `git pull` starts asking for a stash. They are ignored in .gitignore;
+    # this removes them so the working tree is genuinely clean after setup.
+    for stray in list(CACHE.glob("._*")) + list(CACHE.parent.glob("._*")):
+        stray.unlink(missing_ok=True)
+
     n = len(list(CACHE.glob("*.bin")))
     print(f"  installed {n} cached responses from {ARCHIVE.name} "
           f"({ARCHIVE.stat().st_size / 1e6:.1f} MB)")

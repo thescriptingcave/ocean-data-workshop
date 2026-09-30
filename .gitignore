@@ -53,6 +53,11 @@ notebooks/data/
 
 # macOS
 .DS_Store
+# AppleDouble sidecars. macOS writes a `._name` file beside anything carrying extended
+# attributes, and unpacking cache-archive.tar.gz produces one for the .cache directory
+# itself -- so a fresh clone was left dirty and `git pull` needed a stash. Harmless
+# files, but they are not yours and you did not ask for them.
+._*
 probes/RESULTS.jsonl
 # one-off patch scripts. Several were committed by accident, which is how
 # this exists.
