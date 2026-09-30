@@ -4,9 +4,8 @@
 # goes through `uv run` and a Python script rather than a shell script. `make` itself
 # is the one thing to install.
 #
-#   make            setup + open Jupyter Lab
-#   make setup      one-command environment setup
-#   make lab        open Jupyter Lab (the usual way to work)
+#   make lab        setup (database, data, cache, Jupyter) then open Jupyter Lab
+#   make setup      one-command environment setup (database, data, cache)
 #   make notebook   run every notebook top to bottom, with output saved
 #   make test       notebooks, unit tests, lint
 #   make check      the offline guarantee: everything with the network forbidden
@@ -46,15 +45,15 @@ kernel:
 	@$(UVRUN) python -m ipykernel install --user --name python3 \
 		--display-name "Python 3 (ocean-sim)"
 
-## lab: open Jupyter Lab on the notebooks
-lab: kernel
+## lab: set up and open Jupyter Lab on the notebooks
+lab: setup
 	@$(UVRUN) jupyter lab $(NB_DIR)/
 
-## lab-offline: open Jupyter Lab with the network forbidden
+## lab-offline: set up and open Jupyter Lab with the network forbidden
 ##
 ## The network-is-bad case is also one command. Everything is served from the cache, and
 ## each request prints a warning saying so -- the numbers are real, just not new.
-lab-offline: kernel
+lab-offline: setup
 	@OCEAN_DATA_WORKSHOP_OFFLINE=1 $(UVRUN) jupyter lab $(NB_DIR)/
 
 ## beginners: rebuild and run Workshop Intro (5 notebooks, no database)

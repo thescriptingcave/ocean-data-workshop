@@ -207,10 +207,10 @@ def apply_schema() -> None:
          "import sys,psycopg,pathlib;"
          "sys.path.insert(0,'src');"
          "from ocean_data_workshop.dsn import dsn;"
-         "sql=pathlib.Path('learning/schema.sql').read_text();"
+         "sql=pathlib.Path('Workshop/sql_tutorials/schema.sql').read_text();"
          "c=psycopg.connect(dsn(),autocommit=True);"
          "c.execute(sql);c.close();"
-         "print('  ok   applied learning/schema.sql')"],
+         "print('  ok   applied Workshop/sql_tutorials/schema.sql')"],
         timeout=180)
 
 
@@ -226,7 +226,7 @@ def load_data() -> None:
 def prefetch() -> None:
     step(5, 6, "Preparing API responses for the notebooks")
 
-    archive = ROOT / "notebooks" / "cache-archive.tar.gz"
+    archive = ROOT / "Workshop" / "workshop_2" / "cache-archive.tar.gz"
     if archive.exists():
         ok("cache archive present -- the notebooks will not need a network")
         run(["uv", "run", "python", "scripts/prefetch.py", "--install"], timeout=600)
