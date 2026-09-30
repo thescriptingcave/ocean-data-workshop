@@ -3319,8 +3319,10 @@ ML_SETUP = '''
 import sys
 from pathlib import Path
 
-# notebooks/ holds _fetch.py and _sources.py; src/ holds the project's own helpers.
-for p in (Path.cwd(), Path.cwd() / ".." / "src"):
+# workshop_3/ holds _fetch.py and _sources.py; src/ holds the project's own helpers.
+# When opened in Jupyter Lab with Workshop/ as root, Path.cwd() is Workshop/
+# so we need to add workshop_3/ and src/ to the path.
+for p in (Path.cwd() / "workshop_3", Path.cwd() / "src"):
     if p.exists() and str(p) not in sys.path:
         sys.path.insert(0, str(p.resolve()))
 

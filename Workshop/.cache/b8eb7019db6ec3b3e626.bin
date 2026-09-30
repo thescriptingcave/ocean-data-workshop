@@ -74,7 +74,7 @@ Attributes {
     Float64 _FillValue -1.28;
     Float64 colorBarMaximum 1.0;
     Float64 colorBarMinimum 0.0;
-    String comment "ice fraction is a dimensionless quantity between 0 and 1; it has been interpolated by a nearest neighbor approach; EUMETSAT OSI-SAF files used: ice_conc_nh_polstere-100_amsr3_202609221200.nc, ice_conc_sh_polstere-100_amsr3_202609221200.nc.";
+    String comment "ice fraction is a dimensionless quantity between 0 and 1; it has been interpolated by a nearest neighbor approach; EUMETSAT OSI-SAF files used: ice_conc_nh_polstere-100_amsr3_202609211200.nc, ice_conc_sh_polstere-100_amsr3_202609211200.nc.";
     String ioos_category "Ice Distribution";
     String long_name "Sea Ice Area Fraction";
     String source "EUMETSAT OSI-SAF, copyright EUMETSAT";
@@ -93,7 +93,7 @@ Attributes {
     String creator_name "JPL MUR SST project";
     String creator_type "group";
     String creator_url "https://podaac.jpl.nasa.gov/dataset/MUR-JPL-L4-GLOB-v4.1";
-    String date_created "2026-09-29T07:47:28Z";
+    String date_created "2026-09-30T07:19:32Z";
     Float64 Easternmost_Easting 180.0;
     Int32 file_quality_level 3;
     String gds_version_id "2.0";
@@ -108,8 +108,8 @@ Attributes {
     String history "created at nominal 4-day latency; replaced nrt (1-day latency) version.
 Data is downloaded daily from https://podaac-opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L4/GLOB/JPL/MUR/v4.1/ to NOAA NMFS SWFSC ERD by erd.data@noaa.gov .
 The data for the most recent 7 days is usually revised everyday. The data for other days is sometimes revised.
-2026-09-30T07:53:27Z (local files)
-2026-09-30T07:53:27Z https://coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.das";
+2026-09-30T08:27:57Z (local files)
+2026-09-30T08:27:57Z https://coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.das";
     String id "MUR-JPL-L4-GLOB-v04.1";
     String infoUrl "https://podaac.jpl.nasa.gov/dataset/MUR-JPL-L4-GLOB-v4.1";
     String institution "NASA JPL";
