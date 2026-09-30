@@ -1,10 +1,10 @@
-# Workshop Intro
+# Workshop 1 (Intro)
 
 If you have never fetched a URL, start here and skip everything below.
 
 ```bash
-pip install -r beginners/requirements.txt
-jupyter lab beginners/
+pip install -r Workshop/workshop_1/requirements.txt
+jupyter lab Workshop/workshop_1/
 ```
 
 Five notebooks, about 40 minutes, against three real ocean services that need no key.

@@ -1,4 +1,4 @@
-# Workshop Advanced
+# Workshop 2 (Advanced)
 
 Eleven notebooks on getting real ocean data out of public APIs — the parts that are
 documented badly, and the parts that are not documented at all. Assumes you have

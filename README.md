@@ -12,25 +12,32 @@ to interpret them, not to predict them.
 
 | | if you have… | start |
 |---|---|---|
-| **Workshop Intro** | never fetched a URL | [`Workshop/workshop_1/README.md`](Workshop/workshop_1/README.md) — 5 notebooks, 40 min, 5 packages |
-| **Workshop Advanced** | used `requests` before | [`Workshop/workshop_2/README.md`](Workshop/workshop_2/README.md) — 11 notebooks, a database, ~39 catalogued traps |
+| **Workshop 1 (Intro)** | never fetched a URL | [`Workshop/workshop_1/README.md`](Workshop/workshop_1/README.md) — 5 notebooks, 40 min, 5 packages |
+| **Workshop 2 (Advanced)** | used `requests` before | [`Workshop/workshop_2/README.md`](Workshop/workshop_2/README.md) — 11 notebooks, a database, ~39 catalogued traps |
 | **SQL Tutorials** | learning SQL | [`Workshop/sql_tutorials/README.md`](Workshop/sql_tutorials/README.md) — beginner to advanced SQL |
-| **ML Workshop** | have ML experience | [`Workshop/workshop_3/README.md`](Workshop/workshop_3/README.md) — 10 ML notebooks |
+| **Workshop 3 (ML)** | have ML experience | [`Workshop/workshop_3/README.md`](Workshop/workshop_3/README.md) — 10 ML notebooks |
 
 ### Directory Structure
 
 ```
 Workshop/
-├── workshop_1/        # Workshop Intro — beginners-friendly, no database
-├── workshop_2/        # Workshop Advanced — core data access patterns
-├── workshop_3/        # ML Workshop — classification, regression, clustering
+├── workshop_1/        # Workshop 1 (Intro) — beginners-friendly, no database
+├── workshop_2/        # Workshop 2 (Advanced) — core data access patterns
+├── workshop_3/        # Workshop 3 (ML) — classification, regression, clustering
 └── sql_tutorials/     # SQL learning material — beginner to advanced
 ```
 
-The Intro is standalone: no database, no Docker, no `make`, no `.env`, no account, no
-API key. `pip install -r beginners/requirements.txt` and open Jupyter Lab.
+All workshops are ready to run with one command:
 
-Also:
+```bash
+make lab    # setup and open Jupyter Lab (recommended)
+```
+
+Or to just run the notebooks without opening Jupyter Lab:
+
+```bash
+make notebook    # run all notebooks, saving output
+```
 
 **→ [`Workshop/docs/GETTING_STARTED.md`](Workshop/docs/GETTING_STARTED.md)** — from nothing to running, ~85 seconds
 **→ [`Workshop/docs/GLOSSARY.md`](Workshop/docs/GLOSSARY.md)** — every term used, defined
@@ -41,13 +48,12 @@ covered; see the bottom of that file.
 If you are contributing: [`Workshop/CONTRIBUTING.md`](Workshop/CONTRIBUTING.md) — the notebooks are
 generated, do not edit the `.ipynb` files.
 
-## Workshop Intro
+## Workshop 1 (Intro)
 
 If you have never fetched a URL, start here and skip everything below.
 
 ```bash
-pip install -r beginners/requirements.txt
-jupyter lab beginners/
+make lab    # setup and open Jupyter Lab
 ```
 
 Five notebooks, about 40 minutes, against three real ocean services that need no key.
@@ -81,7 +87,7 @@ Without `make`, it is two:
 
 ```bash
 uv run workshop-setup
-uv run jupyter lab notebooks/
+uv run jupyter lab Workshop/workshop_2/
 ```
 
 `make help` lists the rest: `make test`, `make check` (every notebook with the network
