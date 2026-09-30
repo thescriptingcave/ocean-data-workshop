@@ -37,9 +37,9 @@ dependencies = [
     "xarray>=2026.7.0",
 ]
 
-# torch is a default dependency rather than an extra, which costs every attendee a
-# ~200 MB download they may never use -- one notebook out of twenty-six needs it. It was
-# an extra, behind `make bonus`, on the reasoning that nobody should wait through that
+# torch is a default dependency rather than an optional extra, which costs every attendee
+# a ~200 MB download they may never use -- one notebook out of twenty-six needs it. It was
+# an extra, behind its own command, on the reasoning that nobody should wait through that
 # before starting. But a second command after `make` is a step everyone forgets, and the
 # notebook that needs it then quietly prints "not installed" and looks like it worked.
 # One command that does everything is worth 200 MB.

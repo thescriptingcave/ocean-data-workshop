@@ -200,7 +200,7 @@ clean:
 	@$(MAKE) --no-print-directory clean-scratch
 	@echo "  removed the generated notebooks -- 'make notebooks' puts them back"
 
-## clean-scratch: remove cell-written scratch files, keeping the committed notebooks
+## clean-scratch: remove cell-written scratch files, keeping the notebooks
 ##
 ## Deliberately not a `_*` glob: `_fetch.py` and `_sources.py` match it and are tracked
 ## source, not scratch. Only the .nc a cell writes, and _traps.csv, are removed.
