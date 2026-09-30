@@ -1,6 +1,7 @@
-# ocean-sim
+# ocean-data-workshop
 
-An ocean **data workbench** for learning time-series SQL and ML on real public data.
+Hands-on workshops for getting real ocean data out of public APIs — the parts that are
+documented badly, and the parts that are not documented at all.
 
 Not a simulator. For observational data the measurements *are* the answer — the job is
 to interpret them, not to predict them.
@@ -57,7 +58,7 @@ fetched a URL before; if not, do the Intro first.
 make                            # setup, then open Jupyter Lab
 ```
 
-Under a minute from a fresh clone.
+About 85 seconds from a fresh clone.
 
 That is the whole thing: it installs dependencies, starts the database and waits for it
 to be healthy, loads the data, warms the API cache, registers the Jupyter kernel, and
@@ -74,13 +75,73 @@ uv run jupyter lab notebooks/
 `make help` lists the rest: `make test`, `make check` (every notebook with the network
 forbidden), `make fresh` (clone to a temp dir and run setup from nothing).
 
+**One notebook needs a live network: 04, access policy.** It reads what S3 and BigQuery
+say *right now* about who may read them, so it deliberately bypasses the response cache
+— a cached `403` would outlive the policy that produced it. Every other notebook runs
+offline from cache, which is why CI can execute ten of the eleven with the network
+forbidden and gives 04 a job of its own.
+
+| | notebook | access pattern | source |
+|---|---|---|---|
+| 00 | Orientation | — | — |
+| 01 | **The request, three ways** | HTTP fundamentals | ERDDAP |
+| 02 | Query a grid, dimensionally | REST griddap | ERDDAP SST |
+| 03 | List a bucket, fetch one object | cloud object storage | NOAA NCEI GCS |
+| 04 | **Who is allowed to read this?** | access policy | S3 + BigQuery — live only |
+| 05 | Browse a tree, read netCDF | browsable netCDF | Argo GDAC |
+| 06 | Authenticate, then query | credentialed API | Copernicus Marine |
+| 07 | Parse fixed-format text | delimited text | NDBC 46092 |
+| 08 | When a library beats a request | domain library | `gsw` |
+| 09 | **Capstone: join three sources** | all of the above | + TimescaleDB |
+| 10 | **The trap table** | reference | — |
+
 Organised by **access pattern** rather than by dataset, because the patterns transfer and
 the datasets do not. Ends with a result: across 30 frequency bands, wind's correlation
-with underwater noise is 0.204 below 500 Hz and 0.699 above 2 kHz, and every one of the 9
-bands that fails a block-bootstrap significance test is below 200 Hz.
+with underwater noise is 0.204 below 500 Hz and 0.699 above 2 kHz, and **21 of the 30
+bands clear a block-bootstrap significance test** — significance climbing with
+frequency, because the low bands are where the wind signal is buried in noise and the
+high bands are the click band.
 
-**39 traps** found while building it, catalogued in Notebook 10 — **39 reproduced against
-live services**, the rest documented from the service's own behaviour, and not one of them documented anywhere.
+**39 traps** found while building it, catalogued in Notebook 10 — **38 reproduced against
+live services**, the remaining one documented from the service's own behaviour, and not
+one of them documented anywhere.
+
+## The next workshop: ML on real labels
+
+**Not built yet.** Before writing a lesson, the question worth answering is whether
+there is a real learning task here at all — and on this data there is a specific reason
+to doubt it.
+
+NOAA's `ships` and `dolphin` labels are **algorithm output**: vessel events from LTSA
+analysis, dolphin detections from PamGuard. The hourly third-octave levels are *also*
+derived from LTSAs. So predicting a detection from a band level is close to predicting a
+quantity from itself. That is circular by construction, and the way to find out is not
+to argue about it but to measure it.
+
+`scripts/ml_triviality.py` does exactly that:
+
+```bash
+make ml
+```
+
+The verdict is a **green light**, and it is worth recording why, because the reasoning
+generalises:
+
+- **`ships` is not a target at all.** 2,942 hours, 100% positive — it is an event list,
+  not a classification problem. A model on it would be measuring nothing.
+- **`dolphin` is a real task.** 8,387 hours, 22.6% positive, majority baseline 0.774.
+- **A one-line rule does not solve it.** The best single band (20 kHz) reaches 0.533
+  accuracy — *below* the majority baseline. So the task is informative rather than
+  trivial.
+- **A full model plateaus at 0.900** on a time-based split, against a 0.803 test
+  baseline. The test is whether a model approaches 1.0: that would mean the labels are
+  recoverable from the same LTSA the bands came from, and the task is circular. A
+  plateau well short of 1.0 means the detector used information these bands do not
+  contain — a real, if imperfect, learning problem.
+
+One finding is already a workshop-worthy trap in its own right: **the random split
+overstates accuracy** relative to the time-based split, on a time series, which is the
+mistake almost every first ML project makes.
 
 ## Phase -1: data access audit
 
@@ -148,9 +209,13 @@ export OCEAN_DATA_WORKSHOP_DSN="postgresql://postgres:ocean@localhost:5432/ocean
 
 ## Two machine gotchas, already handled in `probes/_common.py`
 
-**Use `http_session()`, never bare `requests`.** This host has AAAA records but no IPv6
-route. curl races addresses (Happy Eyeballs); urllib3 waits out the full connect timeout
-on the dead IPv6 address first — a measured **100× slowdown**, every call.
+**Use `http_session()`, never bare `requests`.** The ERDDAP host
+(`coastwatch.pfeg.noaa.gov`) publishes an AAAA record that some networks cannot route.
+curl races addresses (Happy Eyeballs); urllib3 waits out the full connect timeout on the
+dead IPv6 address first — measured here as **31–36 s per 1.3 kB fetch** against curl's
+0.53 s, and 1.4 s with the fix. This is a property of the host and the network between
+them, not of your machine. Notebook 04 covers the same class of problem from the other
+side.
 
 **`aws s3` is redirected to MinIO.** `~/.aws/config` sets
 `endpoint_url = http://localhost:9000` in the default profile, so bare `aws s3 ls` fails
@@ -166,6 +231,20 @@ beginners/       Workshop Intro — 5 notebooks, own requirements.txt
   02_..ipynb     JSON
   03_..ipynb     compressed text
   04_..ipynb     you write them
+notebooks/       Workshop Advanced — 11 notebooks
+  _fetch.py      a real requests.Session, caching in send() only
+  _sources.py    one manifest of every URL, shared with the prefetch
+  cache-archive.tar.gz   the prefetched responses, so CI runs offline
+learning/        teaching material: schema.sql is the source of truth for the database
+scripts/         the builders, and the tooling around them
+  workshop_notebooks.py  all notebook content -- never edit a .ipynb
+  build_notebooks.py     render + execute, fail on error or a silent cell
+  build_beginners.py     the same for Workshop Intro, self-contained
+  load_db.py     apply the schema, load the data (--with-ocean for the slow part)
+  prefetch.py    warm the response cache
+  ml_triviality.py      the feasibility spike for the next workshop
+src/              ocean_data_workshop/ -- setup, credentials, DSN, HTTP helpers
+  workshop_setup.py     the 6-stage setup behind `make`
 probes/          Phase -1 access probes
   _common.py     contract, cache, verdict format, IPv4-forcing HTTP session
   probe_NN_*.py  one per dataset, exposing fetch(tiny=True)
@@ -173,6 +252,7 @@ probes/          Phase -1 access probes
   VERDICTS.md    hand-written judgements — the real output
   RESULTS.jsonl  append-only history, including fixed failures
   LATEST.json    most recent result per probe
+tests/            unit tests, fast and offline
 ```
 
 Downloads cache to `~/.cache/ocean-sim-harness/` and are reused by later phases, so the
@@ -204,6 +284,11 @@ is trusted.
 
 ## The gate
 
-Phase -1 is not finished until the gate passes: **load a month, plot time × depth, and
-write down three questions worth asking.** Everything here proves *access*. Nothing yet
-proves *interest*.
+The standing test for any addition here: **a plausible number is not a correct number,
+and access is not interest.**
+
+Phase -1 passed its half of that by proving *access* — 10/10 Tier 1 sources, with the
+judgements in [`probes/VERDICTS.md`](probes/VERDICTS.md). The other half is now carried
+by the capstone, which joins three independently-fetched sources in SQL and reports a
+result that survives a block bootstrap. That is the bar a new lesson has to clear: it
+should end in a number you would defend, not a DataFrame you can print.

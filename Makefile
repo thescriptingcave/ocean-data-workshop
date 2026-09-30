@@ -28,7 +28,7 @@ PORT_ARGS := $(if $(filter 5432,$(PORT)),,--port $(PORT))
 .DEFAULT_GOAL := all
 .PHONY: all setup lab lab-offline notebook notebooks test check check-notebooks check-independence \
         lint unit fresh clean clean-cache help deps kernel prefetch db db-ocean shell \
-        beginners
+        beginners ml
 
 ## all: set up, then open Jupyter Lab
 all: setup lab
@@ -81,11 +81,26 @@ prefetch:
 db:
 	@$(UVRUN) python scripts/load_db.py
 
+## ml: is the MB01 detection task real, or circular?
+##
+## The feasibility spike behind the next workshop. NOAA's ships/dolphin labels and the
+## hourly third-octave levels are BOTH derived from LTSA analysis, so predicting a
+## detection from a band level looks like predicting a quantity from itself. This
+## measures it instead of arguing about it: if a model approaches 1.0 the task is
+## circular, and a plateau short of that means the detector used information the bands
+## do not contain.
+##
+## Not part of `make test` -- it trains models, so it is slow and its output is a
+## judgement rather than a pass/fail.
+ml:
+	@$(UVRUN) python scripts/ml_triviality.py
+
 ## db-ocean: also load the GLORYS ocean profile -- ~325 MB of transfer
 ##
 ## Deliberately separate. It is the slowest thing in setup by an order of magnitude,
-## it needs a Copernicus account, and only notebook 08 touches it. The workshop's
-## result -- wind against underwater noise -- needs only wind and acoustics.
+## it needs a Copernicus account, and only notebooks 06 and 09 touch it. The
+## workshop's headline result -- wind against underwater noise -- needs only wind
+## and acoustics, so 08 in particular is unaffected.
 db-ocean:
 	@$(UVRUN) python scripts/load_db.py --with-ocean
 
