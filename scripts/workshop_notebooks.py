@@ -35,7 +35,7 @@ SETUP = '''
 import sys
 from pathlib import Path
 
-# notebooks/ holds _fetch.py and _sources.py; src/ holds the project's own helpers.
+# workshop_2/ holds _fetch.py and _sources.py; src/ holds the project's own helpers.
 for p in (Path.cwd(), Path.cwd() / ".." / "src"):
     if p.exists() and str(p) not in sys.path:
         sys.path.insert(0, str(p.resolve()))
@@ -3246,7 +3246,7 @@ If you would rather not use `make`, these are the two steps it runs:
 
 ```bash
 uv run workshop-setup
-uv run jupyter lab notebooks/
+uv run jupyter lab --notebook-dir=Workshop
 ```
 
 Both work the same on macOS, Linux and Windows. `make setup` and `workshop_setup.py` are

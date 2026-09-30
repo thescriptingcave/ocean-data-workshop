@@ -19,7 +19,7 @@ Without `make`, it is two:
 
 ```bash
 uv run workshop-setup
-uv run jupyter lab notebooks/
+uv run jupyter lab --notebook-dir=Workshop
 ```
 
 `make help` lists the rest: `make test`, `make check` (every notebook with the network

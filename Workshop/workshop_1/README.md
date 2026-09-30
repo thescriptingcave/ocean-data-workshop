@@ -40,10 +40,10 @@ By the end of Workshop Intro, you will be able to:
 
 ```bash
 # Install dependencies
-pip install -r beginners/requirements.txt
+pip install -r Workshop/workshop_1/requirements.txt
 
 # Open Jupyter Lab
-jupyter lab beginners/
+jupyter lab Workshop/workshop_1/
 ```
 
 ## No setup required

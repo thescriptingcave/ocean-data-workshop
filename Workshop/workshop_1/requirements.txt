@@ -1,8 +1,8 @@
 # The whole beginners course. Five packages, no database, no Docker, no keys.
 #
 #   python -m venv .venv && source .venv/bin/activate
-#   pip install -r beginners/requirements.txt
-#   jupyter lab beginners/
+#   pip install -r Workshop/workshop_1/requirements.txt
+#   jupyter lab Workshop/workshop_1/
 #
 # Everything here is free and public. Nothing below needs an account.
 

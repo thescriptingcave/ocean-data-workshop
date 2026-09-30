@@ -70,15 +70,18 @@ jobs:
       - run: uv sync --frozen
 
       - name: restore the prefetched cache
-        run: tar -xzf notebooks/cache-archive.tar.gz -C notebooks
+        run: tar -xzf Workshop/workshop_2/cache-archive.tar.gz -C Workshop
 
       - name: install the notebook kernel
-        run: uv run python -m ipykernel install --user --name python3
+        # No --user, matching workshop_setup.py. The environment data dir is searched
+        # before the user one, so a --user spec here would be shadowed by the venv's own
+        # python3 and this step would register a kernel nothing ever selects.
+        run: uv run python -m ipykernel install --sys-prefix --name python3
 
       - name: record the cache state
-        # Checksum rather than `git diff`: notebooks/.cache is gitignored, so git can
+        # Checksum rather than `git diff`: Workshop/.cache is gitignored, so git can
         # never see it change and the check would pass forever while testing nothing.
-        run: find notebooks/.cache -name '*.bin' -exec sha256sum {} + | sort > /tmp/cache.before
+        run: find Workshop/.cache -name '*.bin' -exec sha256sum {} + | sort > /tmp/cache.before
 
       - name: execute every notebook
         # Notebooks 00-07 and 09 need no database. 08 is gated by the integration
@@ -95,7 +98,7 @@ jobs:
         # A notebook that refetches changes the cache, which means the offline
         # guarantee is weaker than it looks. Invisible until the day of the workshop.
         run: |
-          find notebooks/.cache -name '*.bin' -exec sha256sum {} + | sort > /tmp/cache.after
+          find Workshop/.cache -name '*.bin' -exec sha256sum {} + | sort > /tmp/cache.after
           if ! diff -q /tmp/cache.before /tmp/cache.after >/dev/null; then
             echo "::error::running the notebooks rewrote the cache -- something reached the network"
             diff /tmp/cache.before /tmp/cache.after | head -20
@@ -108,19 +111,19 @@ jobs:
     runs-on: ubuntu-latest
     # Deliberately does NOT use `uv sync` on the root project, and does not install
     # any of it. Workshop Intro is meant to be standalone -- five packages from
-    # beginners/requirements.txt -- and the only way to keep that true is to keep
-    # testing it that way. If it ever starts depending on the database, the cache or
-    # the root pyproject, this job fails.
+    # Workshop/workshop_1/requirements.txt -- and the only way to keep that true is to
+    # keep testing it that way. If it ever starts depending on the database, the cache
+    # or the root pyproject, this job fails.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r beginners/requirements.txt
+      - run: pip install -r Workshop/workshop_1/requirements.txt
       # nbclient/nbformat are what the *builder* needs to execute a notebook
       # programmatically. A beginner never runs the builder -- they open the
       # .ipynb files in jupyter lab -- so they are correctly absent from
-      # beginners/requirements.txt, and are installed here only to drive CI.
+      # Workshop/workshop_1/requirements.txt, and are installed here only to drive CI.
       - run: pip install nbclient nbformat
       - name: execute the Workshop Intro notebooks
         run: python scripts/build_beginners.py --execute
@@ -141,7 +144,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen
-      - run: uv run python -m ipykernel install --user --name python3
+      - run: uv run python -m ipykernel install --sys-prefix --name python3
       - name: the access-policy notebook
         run: uv run python scripts/build_notebooks.py --execute --only 04_cloud_access_policy
 
@@ -180,8 +183,8 @@ jobs:
           enable-cache: true
 
       - run: uv sync --frozen
-      - run: tar -xzf notebooks/cache-archive.tar.gz -C notebooks
-      - run: uv run python -m ipykernel install --user --name python3
+      - run: tar -xzf Workshop/workshop_2/cache-archive.tar.gz -C Workshop
+      - run: uv run python -m ipykernel install --sys-prefix --name python3
 
       - name: load the data
         # Points at the service container above rather than docker compose, so there

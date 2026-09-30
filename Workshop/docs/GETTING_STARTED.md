@@ -288,11 +288,11 @@ everything that is broken, not just the first thing.
 ## Where things are
 
 ```
-notebooks/            the workshop
+Workshop/workshop_2/  the Advanced workshop
   README.md           overview, the result, the trap summary
   _fetch.py           cached fetch + the expect() assertions
   _sources.py         every endpoint, built by functions
-  *.ipynb             10 notebooks, executed, with output
+  *.ipynb             11 notebooks, executed, with output
 src/ocean_data_workshop/
   data/               loaders: glorys, ncei, ndbc
   http.py             IPv4-forcing HTTP session

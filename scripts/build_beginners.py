@@ -1,6 +1,7 @@
-"""Generate the Workshop Intro notebooks (``beginners/``).
+"""Generate the Workshop Intro notebooks (``Workshop/workshop_1/``).
 
-Workshop Advanced (``notebooks/``) assumes you can already hold six access patterns in
+Workshop Advanced (``Workshop/workshop_2/``) assumes you can already hold six access
+patterns in
 your head; Workshop Intro assumes you have never fetched a URL. The two tiers share
 no code and no setup, and this one is deliberately much smaller.
 
@@ -818,7 +819,7 @@ the only part you will need at a job that was not oceanography.
 
 ## Where to go next
 
-**Workshop Advanced** (`../notebooks/`) — the same ideas, against harder services, with
+**Workshop Advanced** (`../workshop_2/`) — the same ideas, against harder services, with
 the failure modes catalogued. Ten notebooks, a database, and about thirty traps.
 
 **Or** take this one of three ways, which is a more honest order than doing them in

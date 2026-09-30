@@ -4,7 +4,8 @@ Run once before the session, on a working network:
 
     uv run python scripts/prefetch.py
 
-Every response the notebooks need is listed in ``notebooks/_sources.py::manifest``, which
+Every response the notebooks need is listed in
+``Workshop/workshop_2/_sources.py::manifest``, which
 the notebooks also import -- so the cached response is guaranteed to be the one the
 notebook asks for. A prefetch that drifted from the notebooks would be worse than none,
 because it would fail silently.
@@ -91,7 +92,11 @@ def main() -> int:
         print("  The notebooks that need these will make a live call instead, and will")
         print("  say so. Everything else is safe offline.")
 
-    print("\n  test it:  OCEAN_DATA_WORKSHOP_OFFLINE=1 uv run jupyter lab notebooks/\n")
+    print(
+        "\n  test it:  make lab-offline\n"
+        "            (or: OCEAN_DATA_WORKSHOP_OFFLINE=1 "
+        "uv run jupyter lab --notebook-dir=Workshop)\n"
+    )
     return 0 if not failed else 1
 
 
