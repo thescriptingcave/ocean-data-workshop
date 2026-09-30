@@ -1,0 +1,80 @@
+═══════════════════════════════════════════════════════════════════════════════
+  OCEAN DATA WORKSHOP - TABLEPLUS SETUP
+═══════════════════════════════════════════════════════════════════════════════
+
+  🗄️  DATABASE: PostgreSQL + TimescaleDB
+  📊  PORT: 5432
+  🔐  PASSWORD: ocean
+
+═══════════════════════════════════════════════════════════════════════════════
+
+  🔗  CONNECT TO TABLEPLUS:
+
+  Type:     PostgreSQL
+  Host:     localhost
+  Port:     5432
+  Database: ocean_data_workshop
+  Username: postgres
+  Password: ocean
+
+═══════════════════════════════════════════════════════════════════════════════
+
+  📁  SQL FILES:
+
+  All in One (Easiest):
+  └── learning/all_sql_combined.sql  (Run this once!)
+
+  Level by Level:
+  ├── beginner/
+  │   ├── 01_provenance.sql      (2 tables)
+  │   ├── 02_ocean_profile.sql   (1 table + hypertable)
+  │   └── 03_wind_daily.sql      (1 table + hypertable)
+  │
+  ├── intermediate/
+  │   ├── 04_acoustic.sql        (1 table, 34 columns!)
+  │   └── 05_detections.sql      (1 table)
+  │
+  └── advanced/
+      ├── 06_views.sql           (2 views)
+      └── 07_comments.sql        (Documentation)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+  🎯  WHAT YOU GET:
+
+  After running SQL, TablePlus shows:
+  • 6 Tables (source, run, ocean_profile_daily, wind_daily, acoustic_tol_hourly, detection_hourly)
+  • 2 Views (v_site_hourly, v_daily_environment)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+  🚀  QUICK START:
+
+  1. Open TablePlus
+  2. Click "+" → New Connection
+  3. Select PostgreSQL
+  4. Enter credentials above
+  5. Open: learning/all_sql_combined.sql
+  6. Copy → Paste → Run (Cmd+R)
+  7. Done! All tables created
+
+═══════════════════════════════════════════════════════════════════════════════
+
+  📊  DATABASE STATUS:
+
+  ✅ Docker: Running
+  ✅ PostgreSQL: 17.11
+  ✅ TimescaleDB: 2.30.1
+  ✅ Database: ocean_data_workshop
+  ✅ Status: Healthy
+
+═══════════════════════════════════════════════════════════════════════════════
+
+  📖  MORE INFO:
+
+  • learning/README.md         - SQL curriculum docs
+  • learning/all_sql_combined.sql - All SQL in one file
+  • TablePlus_Setup_Ready.md   - Complete guide
+  • QUICK_REFERENCE.txt        - This file
+
+═══════════════════════════════════════════════════════════════════════════════
