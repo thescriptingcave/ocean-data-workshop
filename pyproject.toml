@@ -36,6 +36,17 @@ dependencies = [
     "xarray>=2026.7.0",
 ]
 
+[project.optional-dependencies]
+# Optional, not a default dependency. Notebook 10 is the last of twenty-six and is
+# explicitly a bonus: torch is a ~200 MB download that nobody should wait through before
+# starting, and notebooks 02 and 07 cover the same classification and clustering
+# problems with scikit-learn. Declared here rather than left undeclared so that
+# `uv sync --extra bonus` resolves, and so the notebook's "not installed" message can
+# point at a command that actually works.
+bonus = [
+    "torch>=2.9.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",

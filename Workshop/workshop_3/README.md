@@ -69,7 +69,20 @@ This is a **full-day workshop** (6-8 hours) covering:
 - numpy
 - matplotlib
 - seaborn
-- (Optional) PyTorch for deep learning examples
+- (Optional) PyTorch, notebook 10 only — `make bonus`
+
+### Notebook 10 needs PyTorch, which is not installed by default
+
+Notebook 10 is a bonus and PyTorch is a ~200 MB download, so it is an opt-in extra rather
+than a setup step — nobody should wait through that before starting. The notebook runs
+either way and prints which case you are in.
+
+```bash
+make bonus              # or: uv sync --extra bonus
+```
+
+Notebooks 02 (classification) and 07 (clustering) cover the same ground with
+scikit-learn, so skipping this costs you nothing the workshop depends on.
 
 ## Key Concepts
 

@@ -12,6 +12,7 @@
 #   make fresh      clean clone test -- proves setup works from nothing
 #   make clean      remove generated notebooks and scratch files
 #   make clean-scratch  remove only cell-written scratch, keep the committed notebooks
+#   make bonus      optional extras (PyTorch, for notebook 10 only)
 #
 # Override the database port if you already run PostgreSQL locally:
 #   make setup PORT=5433
@@ -40,7 +41,7 @@ PORT_ARGS := $(if $(filter 5432,$(PORT)),,--port $(PORT))
 .DEFAULT_GOAL := all
 .PHONY: all setup lab lab-offline notebook notebooks test check check-notebooks check-independence \
         lint unit fresh clean clean-scratch clean-cache help deps kernel prefetch db db-ocean shell \
-        beginners ml
+        beginners ml bonus
 
 ## all: set up, then open Jupyter Lab
 all: setup lab
@@ -115,6 +116,17 @@ db:
 ## judgement rather than a pass/fail.
 ml:
 	@$(UVRUN) python scripts/ml_triviality.py
+
+## bonus: install the optional extras -- PyTorch, for notebook 10
+##
+## Separate from setup on purpose. torch is a ~200 MB download, and it is needed by
+## exactly one notebook, the last of twenty-six, which is labelled a bonus and whose
+## subject (classification, clustering) is already taught with scikit-learn in 02 and
+## 07. Nobody should wait through that download before starting the workshop, so it is
+## opt-in. Notebook 10 runs either way and says which it did.
+bonus:
+	@$(UV) sync --extra bonus
+	@echo "  PyTorch installed -- rerun notebook 10 to see it"
 
 ## db-ocean: also load the GLORYS ocean profile -- ~325 MB of transfer
 ##
