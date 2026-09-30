@@ -36,6 +36,12 @@ from ocean_data_workshop.data import ncei
 
 SITE = "mb01"
 DEPLOYMENTS = ["02", "03", "04", "05"]  # these carry both ships and dolphins_1h
+
+# The recorder samples at 96 kHz, but no *public* product carries energy above ~24 kHz.
+# Dolphin echolocation peaks far above that, so this is the only band in the whole
+# third-octave feature set that touches the click band -- which makes it the band to
+# ablate before trusting any result on this data.
+CLICK_BAND_HZ = 20000.0
 N_BOOT = 600
 
 
@@ -264,13 +270,164 @@ def main() -> int:
             print("       set fixed and vary only the splitting rule.")
         print(f"    (accuracy alone would be {base:.3f} by always guessing the majority)")
 
+    decisive_checks(aligned)
+
     print(
-        "\nIf a full model approaches 1.0, the labels are recoverable from the same LTSA\n"
-        "the bands came from and the task is circular. A plateau well short of 1.0 means\n"
-        "the detector used information these bands do not contain -- a real, if imperfect,\n"
-        "learning problem."
+        "\n--- what this actually means -------------------------------------------\n"
+        "The plateau is real: this is NOT the naive circularity where a model reaches\n"
+        "1.0. The permutation control lands exactly on the majority rate and the split\n"
+        "is honestly time-based, so nothing is leaking.\n"
+        "\n"
+        "But that green light needs a large asterisk. Two things survive scrutiny:\n"
+        "  * persistence alone is a strong baseline, because the label arrives in\n"
+        "    blocks -- much of the apparent skill is 'it was there an hour ago';\n"
+        "  * nearly all of the remaining skill lives in ONE band, and it is the only\n"
+        "    band in the feature set that overlaps the click band.\n"
+        "\n"
+        "So: real, reproducible and worth teaching -- but a one-band task, whose one\n"
+        "band is the one adjacent to the label's own provenance. That is a more\n"
+        "interesting thing to teach than a clean detector would have been."
     )
     return 0
+
+
+def frequency_ceiling() -> None:
+    """How high does the public data actually go?
+
+    Worth printing before any claim about clicks, because it bounds what is learnable.
+    Verified: tol_1h 25..20000, ol_1h 31.5..16000, psd_1h 20..24000 -- all well below the
+    10-70 kHz band where echolocation lives, despite 96 kHz sampling.
+    """
+    print("\n" + "=" * 74)
+    print("the frequency ceiling: what the public products actually carry")
+    print("=" * 74)
+    for product in ("tol_1h", "ol_1h", "psd_1h"):
+        try:
+            ds = ncei.load_sound_levels(SITE, f"{DEPLOYMENTS[0]}_{product}")
+            f = ds.frequency.values
+            print(f"  {product:<8} {float(f.min()):>8.1f} .. {float(f.max()):>9.1f} Hz"
+                  f"   n={len(f):>6}")
+        except Exception as exc:
+            print(f"  {product:<8} unavailable ({type(exc).__name__})")
+    print("  the recorder samples at 96 kHz, so the data exists -- it is just not in")
+    print("  these products. Any click-band claim from this data is a claim about the")
+    print("  20 kHz band and nothing else.")
+
+
+def decisive_checks(aligned: dict) -> None:
+    """The three tests that decide whether the task is worth teaching.
+
+    Added after this script's first version reported a plain "green light". That verdict
+    was defensible on its own terms -- the model plateaus well short of 1.0 -- but it had
+    never been compared against the two baselines that actually matter: a rule that knows
+    what happened an hour ago, and the model with the click band removed.
+    """
+    import numpy as np
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import (
+        accuracy_score,
+        f1_score,
+        precision_score,
+        recall_score,
+    )
+    from sklearn.preprocessing import StandardScaler
+
+    print("\n" + "=" * 74)
+    print("how much of that was the bands, and how much was the clock?")
+    print("=" * 74)
+    frequency_ceiling()
+
+    for k, (X, y) in aligned.items():
+        if len(y) < 1000 or y.value_counts().min() < 50:
+            continue
+
+        cut = int(len(X) * 0.75)
+        Xtr, Xte, ytr, yte = X.iloc[:cut], X.iloc[cut:], y.iloc[:cut], y.iloc[cut:]
+        base = max((yte == 0).mean(), (yte == 1).mean())
+        print(f"\n  target {k}: test majority {base:.3f}, "
+              f"train prevalence {ytr.mean():.1%}, test prevalence {yte.mean():.1%}")
+
+        # how autocorrelated is the label?  this is what makes persistence strong
+        agree = float((y.to_numpy()[1:] == y.to_numpy()[:-1]).mean())
+        runs = (y != y.shift()).cumsum()
+        lens = y.groupby(runs).agg(["size", "first"])
+        lens = lens[lens["first"] == 1]["size"]
+        print(f"  label comes in blocks: {agree:.1%} hour-to-hour agreement, "
+              f"{len(lens)} positive runs, median {lens.median():.0f} h, "
+              f"longest {lens.max():.0f} h")
+
+        prev = y.shift(1)
+        common = prev.index.intersection(yte.index)
+        p_prev = prev.loc[common].fillna(0).astype(int)
+        print(f"  {'persistence y(t-1)':38} acc {accuracy_score(yte, p_prev):.3f}")
+
+        def fit(a_tr, a_te, y_tr, y_te):
+            """y_tr/y_te are arguments rather than closed over, so this cannot bind
+            the wrong loop iteration if a second target is ever added."""
+            sc = StandardScaler().fit(a_tr)
+            clf = LogisticRegression(max_iter=3000).fit(sc.transform(a_tr), y_tr)
+            pred = clf.predict(sc.transform(a_te))
+            return (accuracy_score(y_te, pred), f1_score(y_te, pred, zero_division=0),
+                    precision_score(y_te, pred, zero_division=0),
+                    recall_score(y_te, pred, zero_division=0))
+
+        yv = y.astype(float)
+        lags = pd.DataFrame({
+            "lag1": yv.shift(1),
+            "lag2": yv.shift(2),
+            "roll3": yv.rolling(3, min_periods=1).max().shift(1),
+            "roll6": yv.rolling(6, min_periods=1).max().shift(1),
+        })
+        Ltr, Lte = lags.iloc[:cut].fillna(0.0), lags.iloc[cut:].fillna(0.0)
+
+        print()
+        got = {}
+        for name, a_tr, a_te in [
+            ("lags only (6 h of past labels)", Ltr, Lte),
+            ("all bands only", Xtr, Xte),
+            ("lags + all bands", pd.concat([Ltr, Xtr], axis=1),
+             pd.concat([Lte, Xte], axis=1)),
+        ]:
+            acc, f1, pr, rc = fit(a_tr.to_numpy(), a_te.to_numpy(), ytr, yte)
+            got[name] = (acc, f1)
+            print(f"  {name:38} acc {acc:.3f}  f1 {f1:.3f}  "
+                  f"prec {pr:.3f}  rec {rc:.3f}")
+
+        if CLICK_BAND_HZ not in X.columns:
+            continue
+
+        # The third-octave product stops at 20 kHz and dolphin echolocation peaks well
+        # above it, so exactly one band in the whole feature set touches the click band.
+        # If the model leans on that band, it is closer to recovering the label's own
+        # provenance than to hearing a dolphin.
+        rest = [c for c in X.columns if c != CLICK_BAND_HZ]
+        acc_no, f1_no, _, _ = fit(
+            pd.concat([Ltr, Xtr[rest]], axis=1).to_numpy(),
+            pd.concat([Lte, Xte[rest]], axis=1).to_numpy(),
+            ytr, yte,
+        )
+        acc_all, f1_all = got["lags + all bands"]
+        print()
+        print(f"  {f'lags + bands minus {CLICK_BAND_HZ:.0f} Hz':38} acc {acc_no:.3f}  "
+              f"f1 {f1_no:.3f}")
+        print(f"  -> dropping the only click-band column costs "
+              f"{acc_all - acc_no:+.3f} accuracy and {f1_all - f1_no:+.3f} f1")
+
+        # ablation on the full model, which is the honest way to ask the question
+        A, B = Xtr.to_numpy(), Xte.to_numpy()
+        sc = StandardScaler().fit(A)
+        clf = LogisticRegression(max_iter=3000).fit(sc.transform(A), ytr)
+        S_te = sc.transform(B)
+        full = accuracy_score(yte, clf.predict(S_te))
+        j = list(X.columns).index(CLICK_BAND_HZ)
+        rng = np.random.default_rng(0)
+        drops = []
+        for _ in range(10):
+            Bp = S_te.copy()
+            Bp[:, j] = rng.permutation(Bp[:, j])
+            drops.append(full - accuracy_score(yte, clf.predict(Bp)))
+        print(f"  -> shuffling ONLY that column at test time: {full:.3f} -> "
+              f"{full - float(np.mean(drops)):.3f}")
 
 
 if __name__ == "__main__":

@@ -124,24 +124,60 @@ to argue about it but to measure it.
 make ml
 ```
 
-The verdict is a **green light**, and it is worth recording why, because the reasoning
-generalises:
+The verdict is **a green light with a large asterisk**, and the asterisk is the
+interesting part. It is worth recording in full, because the reasoning generalises
+further than the conclusion does.
 
 - **`ships` is not a target at all.** 2,942 hours, 100% positive — it is an event list,
   not a classification problem. A model on it would be measuring nothing.
-- **`dolphin` is a real task.** 8,387 hours, 22.6% positive, majority baseline 0.774.
-- **A one-line rule does not solve it.** The best single band (20 kHz) reaches 0.533
-  accuracy — *below* the majority baseline. So the task is informative rather than
-  trivial.
-- **A full model plateaus at 0.900** on a time-based split, against a 0.803 test
-  baseline. The test is whether a model approaches 1.0: that would mean the labels are
-  recoverable from the same LTSA the bands came from, and the task is circular. A
-  plateau well short of 1.0 means the detector used information these bands do not
-  contain — a real, if imperfect, learning problem.
+- **`dolphin` is a real task.** 8,387 hours, 22.6% positive, majority baseline 0.803.
+- **It is not the naive circularity.** A full model plateaus at 0.898, nowhere near the
+  1.0 that would mean the labels are recoverable from the same LTSA the bands came from.
+  The permutation control lands exactly on the majority rate, and the split is honestly
+  time-based, so nothing is leaking.
 
-One finding is already a workshop-worthy trap in its own right: **the random split
-overstates accuracy** relative to the time-based split, on a time series, which is the
-mistake almost every first ML project makes.
+Then three measurements that the first version of this spike did not make, and which
+change the conclusion:
+
+| | accuracy | f1 |
+|---|---|---|
+| always predict the majority | 0.803 | — |
+| **persistence: "was there one an hour ago?"** | **0.872** | 0.676 |
+| all 30 bands, no history | 0.898 | 0.700 |
+| lags + all 30 bands | 0.910 | 0.753 |
+| lags + bands **minus 20 kHz** | 0.876 | 0.647 |
+
+**Persistence alone scores 0.872 against the model's 0.898.** The label arrives in
+blocks — 86.5% hour-to-hour agreement, 565 positive runs, longest 21 hours — so most of
+the apparent skill is "it was there an hour ago", and a one-line rule gets most of the
+way there.
+
+And nearly all of what remains lives in **one band**. Shuffling only the 20 kHz column
+at test time takes the model from 0.898 to 0.548; removing it from the model entirely
+gives back almost nothing (+0.003 over lags alone).
+
+That band is the one that matters, because of where the data stops:
+
+```
+tol_1h    25 ..  20000 Hz     30 bands
+ol_1h   31.5 ..  16000 Hz     10 bands
+psd_1h    20 ..  24000 Hz  23,981 bins
+```
+
+The recorder samples at **96 kHz**, but no public product carries energy above ~24 kHz,
+and dolphin echolocation peaks far above that. So the single band the model relies on is
+the only band in the feature set that comes near the signal the label was derived from.
+
+**So: real, reproducible, and worth teaching — but a one-band task, whose one band is the
+one adjacent to the label's own provenance.** The features and the labels share a sensor
+and a processing chain. A model can work well and still be nearly uninformative about
+biology, because what it recovered was "was there a transient in this window", not "was
+there a dolphin". That is a real, subtle, and rarely-taught distinction, and it is a much
+better workshop than a clean detector would have been.
+
+Two more traps fall out of the same measurements: **a random split overstates accuracy**
+on a time series, and **train/test prevalence differ** (23.6% vs 19.7%) so an accuracy
+figure can fall while recall rises.
 
 ## Phase -1: data access audit
 
