@@ -43,6 +43,12 @@ from nbbuild import NOTEBOOKS  # noqa: E402
 # Execution order is the order of this list. 01 is the spine and must pass before
 # anything that assumes the reader has seen it; 00 is written last and listed first
 # only because it is what a person opens.
+# A cell may raise this to end its notebook deliberately when the data it needs is not
+# present. It is reported as a skip, not a failure -- see execute(). Defined as a name
+# rather than imported so a notebook can raise it without importing this module, which
+# would drag in nbclient at authoring time.
+SKIP_MARKER = "NotebookSkipped"
+
 NOTEBOOK_ORDER = [
     # Data retrieval notebooks
     "00_orientation",
@@ -98,15 +104,28 @@ def execute(path: Path, timeout: int = 900) -> tuple[bool, str]:
 
     # A cell that raised is not a failure of the *run*, but it is a failure of the
     # notebook: an unhandled error in a workshop artifact is a bug in this repo.
+    #
+    # The exception is _SkipNotebook, which a notebook raises deliberately when the
+    # data it needs is not present -- notebook 07 without `make db-ocean`, say. That is
+    # not a bug and not a broken run, and counting it as a failure would make
+    # `make notebook` red on every machine that skipped the optional 325 MB GLORYS
+    # download. It is a skip: reported, not failed.
+    skip = False
     if not err:
         for i, cell in enumerate(nb.cells):
             if cell.cell_type != "code":
                 continue
             for out in cell.get("outputs", []):
                 if out.get("output_type") == "error":
+                    if out.get("ename") == SKIP_MARKER:
+                        # Keep the notebook's own explanation: it is the actionable part,
+                        # and "data not available" tells the reader nothing.
+                        skip = True
+                        err = "skipped: " + (out.get("evalue") or "data not available")
+                        break
                     err = f"cell {i}: {out.get('ename', '?')}: " + (out.get("evalue") or "")[:70]
                     break
-            if err:
+            if err or skip:
                 break
 
     # Write back either way. A notebook that errored still shows *where* it errored,
@@ -115,6 +134,8 @@ def execute(path: Path, timeout: int = 900) -> tuple[bool, str]:
 
     # Guard against the silent failure mode: an "executed" notebook with no output at
     # all means execution never happened, and would otherwise look like success.
+    if skip:
+        return True, err or "skipped: data not available"
     if not err:
         n_out = sum(
             len(c.get("outputs", [])) for c in nb.cells if c.cell_type == "code"
@@ -204,7 +225,12 @@ def main() -> int:
     for path in built:
         t = time.time()
         ok, err = execute(path)
-        if ok:
+        if ok and err.startswith("skipped"):
+            # Reported separately from `ok`, because a skip means the notebook stopped
+            # early on purpose -- data it needs is not loaded. Printing it as `ok` would
+            # hide the one thing the reader needs to know.
+            print(f"  SKIP  {path.name:34} {err[len('skipped'):].strip()}")
+        elif ok:
             print(f"  ok    {path.name:34} {time.time() - t:>5.1f}s")
         else:
             print(f"  FAIL  {path.name:34} {err}")

@@ -4332,6 +4332,14 @@ def nb_ml_07() -> object:
 # 07 - Unsupervised Learning: Ocean Regime Clustering
 
 Can we identify distinct ocean regimes (e.g., upwelling, relaxed, transition)?
+
+**This is the one ML notebook that needs `make db-ocean`.** Everything here clusters
+temperature, salinity and currents, and all three come from GLORYS, which `make setup`
+skips by default: it is the slowest part of setup (~325 MB) and needs a free Copernicus
+account. Every other notebook in this workshop runs on a default install.
+
+If the cell below reports zero ocean profiles, run `make db-ocean` and re-run. It will
+say so and stop rather than failing later on an empty array.
 """),
         *ml_preamble(),
         
@@ -4359,6 +4367,27 @@ ocean_df = pd.read_sql_query(query, conn)
 conn.close()
 
 print(f"Ocean profile data: {len(ocean_df):,} rows")
+
+# Stop here, loudly and specifically, if GLORYS was never loaded. Clustering an empty
+# frame does not produce a useful error -- StandardScaler raises "Found array with 0
+# sample(s)" three cells later, which says nothing about the actual cause. Notebook 09
+# degrades quietly when ocean_profile_daily is empty because its result only needs wind
+# and acoustics; this notebook's entire subject is the ocean, so there is nothing to say
+# without it.
+if len(ocean_df) == 0:
+    print()
+    print("  ocean_profile_daily is empty -- this notebook needs the GLORYS ocean")
+    print("  profiles, which `make setup` skips by default: it is ~325 MB and needs a")
+    print("  free Copernicus Marine account.")
+    print()
+    print("      make db-ocean")
+    print()
+    print("  It is the only notebook in Workshop 3 that needs it. Every other notebook")
+    print("  here, and all of Workshop 2, runs on a default install.")
+    print()
+    class NotebookSkipped(Exception):
+        \"\"\"Raised deliberately: the data this notebook needs is not loaded.\"\"\"
+    raise NotebookSkipped("ocean_profile_daily is empty; run `make db-ocean`")
 
 # Get unique dates
 dates = ocean_df['observed_at'].unique()

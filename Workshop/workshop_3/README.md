@@ -71,6 +71,20 @@ This is a **full-day workshop** (6-8 hours) covering:
 - seaborn
 - PyTorch — installed by `make`, for notebook 10
 
+### Notebook 07 needs `make db-ocean`, and is the only one that does
+
+Notebook 07 clusters temperature, salinity and currents. All three come from GLORYS,
+which `make setup` **skips by default** — it is the slowest part of setup (~325 MB) and
+needs a free [Copernicus Marine](https://data.marine.copernicus.eu) account.
+
+```bash
+make db-ocean
+```
+
+Without it, `ocean_profile_daily` is empty and notebook 07 says so and stops, rather
+than failing three cells later with `Found array with 0 sample(s)`. Every other notebook
+in this workshop — and all of Workshop 2 — runs on a default install.
+
 ### Notebook 10 needs PyTorch, which `make` installs
 
 PyTorch is a ~200 MB download and only notebook 10 uses it, but it is a default
