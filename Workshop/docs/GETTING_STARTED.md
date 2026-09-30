@@ -18,14 +18,14 @@ says so.
 |---|---|---|
 | **Python** | 3.11 or newer | you do **not** need to install it — see below |
 | **Docker** | Docker Desktop, or `docker-ce` + the compose plugin | only for Notebook 09 |
-| **Disk** | ~200 MB free | Python env, ~15 MB of data, 6 MB of cache |
+| **Disk** | ~1 GB free | ~850 MB is the Python env on its own; plus ~15 MB of data and the cache |
 | **Time** | 5 min to set up, 2h40 of workshop | compute time is 27 s; the rest is discussion |
 
 A free **Copernicus Marine** account is optional. It unlocks Notebook 06 and the ocean
 profile (temperature, salinity, currents).
 
 **Verified working without one.** On a machine with no account: the three anonymous
-sources load, all ten notebooks run, and Notebook 09's result is unaffected — it joins
+sources load, every notebook runs, and Notebook 09's result is unaffected — it joins
 wind to acoustics, and neither needs an account. Nothing else needs a login.
 
 ### Which workshop is right for you?
@@ -93,24 +93,28 @@ cd ocean-sim
 make
 ```
 
-That is the whole thing. It:
+That is the whole thing. It prints six numbered steps:
 
-1. checks Docker is installed and running
-2. starts PostgreSQL 17 + TimescaleDB and **waits for it to be healthy**
+1. checks Docker is installed, the daemon responds, and the compose plugin exists
+2. starts PostgreSQL 17 + TimescaleDB from `docker-compose.yml` and **waits for it to
+   be healthy**
 3. applies the schema from `Workshop/sql_tutorials/schema.sql`
 4. downloads ~15 MB of real data and loads it (the GLORYS ocean profile is
    **not** included by default — see below)
 5. warms the API cache so the notebooks do not depend on the network
 6. registers the Jupyter kernel and checks that `jupyter lab` actually runs
-7. opens Jupyter Lab on `Workshop/workshop_2/`
+
+then opens Jupyter Lab on the `Workshop/` folder, so all three workshops are in the
+file browser.
 
 Typical time from a fresh clone: **under a minute**, about 15 MB of downloads.
 
-**About 40 seconds is the number to expect, and a much longer one is a problem, not
-patience.** The GLORYS ocean profile is the only slow part and it is skipped by
-default; if setup seems stuck, this is what to check — see the troubleshooting entry
-for "stuck at 4/6" below. Re-run it
-any time — every stage is idempotent.
+**About 40 seconds is the number to expect once the Docker image is present, and a much
+longer one is a problem, not patience.** On a machine that has never run this before,
+the first step also has to pull `timescale/timescaledb:2.30.1-pg17`, and that pull is
+most of a fresh install. The GLORYS ocean profile is the only slow *data* step and it is
+skipped by default; if setup seems stuck, this is what to check — see the troubleshooting
+entry for "stuck at 4/6" below. Re-run it any time — every stage is idempotent.
 
 `make` is a build tool: already installed with the Xcode command line tools on macOS,
 and available from your package manager on Linux and Windows. If you would rather not
@@ -118,8 +122,13 @@ use it, the same two steps are:
 
 ```bash
 uv run workshop-setup
-uv run jupyter lab Workshop/workshop_2/
+uv run jupyter lab --notebook-dir=Workshop
 ```
+
+`--notebook-dir=Workshop` is what `make lab` passes, and it opens on the folder holding
+all three workshops rather than one notebook directory. Jupyter Lab restores the last
+directory you were in, so `make` clears that first — otherwise a session spent inside
+`workshop_3/` wins over the flag and it looks like the flag was ignored.
 
 ### If the network is bad
 
@@ -170,13 +179,18 @@ Jupyter Lab prints a URL that contains a **token**, and opens your browser at it
 token is in the terminal you launched from — so keep that terminal open. If you ever land
 on a `login?next=...` page instead, the token is the long string in the original URL;
 paste it back and the page resolves. This is Jupyter's own behaviour, not a project
-setting, and it is the one thing worth knowing before you walk in. The last cell asserts the environment is
-ready and prints **"Environment is ready. Start with 01."**
+setting, and it is the one thing worth knowing before you walk in.
 
 To check the offline path end to end:
 
 ```bash
-OCEAN_DATA_WORKSHOP_OFFLINE=1 uv run jupyter lab Workshop/workshop_2/
+make lab-offline
+```
+
+or, without make:
+
+```bash
+OCEAN_DATA_WORKSHOP_OFFLINE=1 uv run jupyter lab --notebook-dir=Workshop
 ```
 
 Every notebook should still work, each request printing a warning that it is using a
@@ -207,28 +221,34 @@ table).
 
 ## Timing, measured
 
-Execution times, from the build system. **Nobody is waiting on compute** — 27 seconds for
-the whole workshop. The time is spent talking about traps.
+Execution times, measured on this machine against the committed notebooks.
+**Nobody is waiting on compute** — 35 seconds for the whole workshop. The time is spent
+talking about traps.
 
 | notebook | runs in | worth spending |
 |---|---|---|
-| 00 orientation | 1.7 s | 10 min |
-| 01 the request, three ways | 6.5 s | 25 min |
-| 02 ERDDAP griddap | 1.9 s | 20 min |
-| 03 GCS object storage | 2.0 s | 20 min |
-| 04 Argo GDAC | 1.8 s | 20 min |
-| 05 Copernicus | 5.1 s | 15 min |
-| 06 NDBC | 1.8 s | 12 min |
-| 07 gsw | 1.8 s | 10 min |
-| 08 capstone | 3.5 s | 25 min |
-| 09 trap table | 1.6 s | reference, 0 min |
+| 00 orientation | 1.4 s | 10 min |
+| 01 the request, three ways | 4.7 s | 25 min |
+| 02 ERDDAP griddap | 1.7 s | 20 min |
+| 03 GCS object storage | 1.9 s | 20 min |
+| 04 who may read this? | 4.1 s | 15 min |
+| 05 Argo GDAC netCDF | 1.7 s | 20 min |
+| 06 Copernicus | 11.4 s | 15 min |
+| 07 NDBC | 1.7 s | 12 min |
+| 08 gsw | 1.7 s | 10 min |
+| 09 capstone | 3.4 s | 25 min |
+| 10 trap table | 1.5 s | reference, 0 min |
 
-Full run: **2h37** of material, plus ~20 minutes of breaks.
+Full run: **35 seconds** of compute, **2h40** of material, plus ~20 minutes of breaks.
+
+04 is the one notebook that needs a live network — its subject is what three services say
+*right now* about who may read them, so it deliberately bypasses the cache. The 4.1 s
+above is with the network up; the offline figure is not meaningful for it.
 
 ### A shorter version
 
-If you have **60 minutes**, notebooks **00 + 01 + 09** are a complete workshop on their
-own: orientation, the spine, and the trap table. The other seven are depth. This has not
+If you have **60 minutes**, notebooks **00 + 01 + 10** are a complete workshop on their
+own: orientation, the spine, and the trap table. The other eight are depth. This has not
 been rehearsed end to end yet — treat it as untested.
 
 ---
@@ -293,15 +313,20 @@ Workshop/workshop_2/  the Advanced workshop
   _fetch.py           cached fetch + the expect() assertions
   _sources.py         every endpoint, built by functions
   *.ipynb             11 notebooks, executed, with output
+Workshop/workshop_1/  the Intro workshop
+  *.ipynb             5 notebooks, executed, with output
+Workshop/workshop_3/  the ML workshop
+  *.ipynb             10 notebooks, executed, with output
 src/ocean_data_workshop/
   data/               loaders: glorys, ncei, ndbc
   http.py             IPv4-forcing HTTP session
   dsn.py              one place that knows the database address
   workshop_setup.py   the one-command setup
 scripts/              build, prefetch, load, verify
-learning/schema.sql   the database schema, written to be read
+Workshop/sql_tutorials/schema.sql   the database schema, written to be read
 probes/               the original source-access audit and its verdicts
-GLOSSARY.md           every term used, defined
+Workshop/docs/GLOSSARY.md           every term used, defined
+docker-compose.yml    PostgreSQL + TimescaleDB, for notebook 09
 ```
 
 ---

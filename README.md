@@ -234,15 +234,16 @@ Workshop/                    # All workshop materials organized by level
 │   ├── cache-archive.tar.gz the prefetched responses, so CI runs offline
 │   └── *.ipynb             the workshop notebooks
 └── workshop_3/             # ML Workshop — 10 ML notebooks
-    ├── ml_01_..ipynb       ML orientation, classification
-    ├── ml_02_..ipynb       Feature importance
-    ├── ml_03_..ipynb       Time-based evaluation
-    ├── ml_04_..ipynb       Beyond accuracy
-    ├── ml_05_..ipynb       Wind prediction
-    ├── ml_06_..ipynb       Clustering
-    ├── ml_07_..ipynb       Capstone
-    ├── ml_08_..ipynb       ML traps
-    └── ml_09_..ipynb       Deep learning
+    ├── ml_01_orientation   ML orientation
+    ├── ml_02_classification  dolphin detection
+    ├── ml_03_features     feature importance, the 20 kHz trap
+    ├── ml_04_evaluation   time-based splits
+    ├── ml_05_metrics      precision vs recall
+    ├── ml_06_wind         wind prediction
+    ├── ml_07_clustering   ocean regime clustering
+    ├── ml_08_capstone     capstone
+    ├── ml_09_traps        the ML trap table
+    └── ml_10_pytorch      bonus: deep learning
 
 scripts/                    the builders, and the tooling around them
   workshop_notebooks.py     all notebook content -- never edit a .ipynb
